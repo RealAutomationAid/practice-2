@@ -55,28 +55,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// GET specific test project by ID
-export async function GET_BY_ID(projectId: string) {
-  try {
-    const { data: testProject, error } = await supabase
-      .from('winners_test_projects')
-      .select('*')
-      .eq('id', projectId)
-      .eq('is_active', true)
-      .single();
 
-    if (error) {
-      console.error('Database error:', error);
-      return null;
-    }
-
-    return testProject;
-
-  } catch (error) {
-    console.error('Error fetching test project:', error);
-    return null;
-  }
-}
 
 // POST endpoint: Create a new test project
 export async function POST(request: NextRequest) {
