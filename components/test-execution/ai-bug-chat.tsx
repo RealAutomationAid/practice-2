@@ -8,9 +8,10 @@ export interface ChatMessage {
   id: string
   type: 'user' | 'ai' | 'system'
   content: string
-  timestamp: Date
+  timestamp: string // ISO string
   bugCreated?: boolean
   bugId?: string
+  attachments?: AttachmentFile[] // Add attachments to messages
 }
 
 interface AttachmentFile {
@@ -32,7 +33,7 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
       id: 'welcome',
       type: 'system',
       content: 'Welcome to the AI Bug Chat! Describe any bugs or issues you\'ve encountered, and I\'ll help you create structured bug reports automatically.',
-      timestamp: new Date()
+      timestamp: new Date().toISOString()
     }
   ])
   const [inputMessage, setInputMessage] = useState('')
@@ -117,6 +118,36 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
     setAttachments(prev => prev.filter((_, i) => i !== index))
   }
 
+  // Handle paste event
+  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = event.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          if (file.size > 5 * 1024 * 1024) {
+            toast.error('File size must be less than 5MB');
+            continue;
+          }
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const result = e.target?.result as string;
+            const newAttachment: AttachmentFile = {
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              data: result,
+              preview: result
+            };
+            setAttachments(prev => [...prev, newAttachment]);
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    }
+  };
+
   // Send message to AI
   const handleSendMessage = async () => {
     if ((!inputMessage.trim() && attachments.length === 0) || isLoading) return
@@ -126,7 +157,8 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
       id: `user_${Date.now()}`,
       type: 'user',
       content: messageContent + (attachments.length > 0 ? ` (${attachments.length} image${attachments.length > 1 ? 's' : ''} attached)` : ''),
-      timestamp: new Date()
+      timestamp: new Date().toISOString(),
+      attachments: attachments.length > 0 ? [...attachments] : undefined
     }
 
     setMessages(prev => [...prev, userMessage])
@@ -158,7 +190,7 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
         id: `ai_${Date.now()}`,
         type: 'ai',
         content: data.response,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         bugCreated: data.bugCreated,
         bugId: data.bugId
       }
@@ -177,7 +209,7 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
         id: `error_${Date.now()}`,
         type: 'system',
         content: 'Sorry, I encountered an error while processing your message. Please try again.',
-        timestamp: new Date()
+        timestamp: new Date().toISOString()
       }
       setMessages(prev => [...prev, errorMessage])
       toast.error('Failed to send message')
@@ -187,8 +219,12 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
   }
 
   // Format timestamp
-  const formatTimestamp = (timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
+  const formatTimestamp = (timestamp: string) => {
+    if (!hydrated) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
   // Get message icon
@@ -245,6 +281,18 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
                   <div className="whitespace-pre-wrap break-words">
                     {message.content}
                   </div>
+                  {message.attachments && message.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {message.attachments.map((attachment, idx) => (
+                        <img
+                          key={idx}
+                          src={attachment.preview || attachment.data}
+                          alt={attachment.name}
+                          className="w-20 h-20 object-cover rounded border"
+                        />
+                      ))}
+                    </div>
+                  )}
                   {message.bugCreated && (
                     <div className="flex items-center space-x-1 mt-2 text-green-600">
                       <CheckCircle className="w-4 h-4" />
@@ -311,6 +359,7 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder="Describe the bug you encountered..."
               className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={1}

@@ -119,7 +119,7 @@ function extractBugDataFallback(message: string): any {
 
   // Extract browser
   const browserMatch = message.toLowerCase().match(/(chrome|firefox|safari|edge|internet explorer|ie)/i)
-  const browser = browserMatch ? browserMatch[1] : 'unknown'
+  const browser = browserMatch ? browserMatch[1] : 'chrome'
 
   // Extract device
   const deviceMatch = message.toLowerCase().match(/(mobile|phone|tablet|ipad|android|desktop|laptop)/i)
@@ -161,7 +161,7 @@ function extractBugDataFallback(message: string): any {
       description: message,
       severity,
       priority,
-      environment: 'production',
+      environment: 'local',
       browser,
       device,
       os: 'unknown',
@@ -205,6 +205,12 @@ async function extractBugDataWithAI(message: string, conversationHistory: ChatMe
 
     // Parse JSON response
     const parsed = JSON.parse(responseText)
+    
+    // Ensure browser/environment defaults
+    if (parsed.bugData) {
+      if (!parsed.bugData.browser) parsed.bugData.browser = 'chrome';
+      if (!parsed.bugData.environment) parsed.bugData.environment = 'local';
+    }
     return parsed
   } catch (error) {
     console.error('OpenAI extraction failed:', error)
@@ -220,11 +226,11 @@ async function createBugReport(bugData: any, attachments?: any[]): Promise<strin
       description: bugData.description || '',
       severity: bugData.severity || 'medium',
       priority: bugData.priority || 'medium',
-      reporter_name: bugData.reporter_name || 'admin',
-      reporter_email: bugData.reporter_email || 'admin@test.com',
+      reporter_name: 'Sava/Slav',
+      reporter_email: 'sava@slav.com',
       assigned_to: bugData.assigned_to || null,
-      environment: bugData.environment || 'production',
-      browser: bugData.browser || 'unknown',
+      environment: bugData.environment || 'local',
+      browser: bugData.browser || 'chrome',
       device: bugData.device || 'desktop',
       os: bugData.os || 'unknown',
       url: bugData.url || '',

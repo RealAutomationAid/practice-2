@@ -13,8 +13,10 @@ import {
   Bug
 } from 'lucide-react'
 import { QuickBugForm } from './quick-bug-form'
+import { EnhancedBugForm } from './enhanced-bug-form'
 import { SimpleBugGrid } from './simple-bug-grid'
 import { AIBugChat } from './ai-bug-chat'
+import { HTMLBugReport } from './html-bug-report'
 import { CreateBugFormData, BugReportExtended, BatchOperation, ExportOptions } from './types'
 import { WinnersBugReport, BugReportInsert } from '@/lib/supabase-types'
 import { exportUtils, realtimeUtils, keyboardUtils } from '@/lib/test-execution-utils'
@@ -35,6 +37,7 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
   const [bugs, setBugs] = useState<BugReportExtended[]>(initialData)
   const [loading, setLoading] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [editingBug, setEditingBug] = useState<BugReportExtended | null>(null)
   const [selectedBug, setSelectedBug] = useState<BugReportExtended | null>(null)
   const [showSummaryReport, setShowSummaryReport] = useState(false)
 
@@ -105,7 +108,9 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
         shortcut: { key: 'Escape' },
         handler: () => {
           setShowCreateForm(false)
+          setEditingBug(null)
           setSelectedBug(null)
+          setShowSummaryReport(false)
         }
       }
     ]
@@ -174,8 +179,71 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
 
   // Handle edit bug
   const handleEditBug = (bug: BugReportExtended) => {
-    setSelectedBug(bug)
+    setEditingBug(bug)
     setShowCreateForm(true)
+  }
+
+  // Handle update bug
+  const handleUpdateBug = async (formData: CreateBugFormData, files: File[]) => {
+    if (!editingBug) return
+
+    try {
+      setLoading(true)
+
+      // Prepare bug data
+      const bugData = {
+        title: formData.title,
+        description: formData.description,
+        severity: formData.severity,
+        priority: formData.priority,
+        reporter_name: formData.reporter_name,
+        reporter_email: formData.reporter_email,
+        environment: formData.environment,
+        browser: formData.browser,
+        device: formData.device,
+        os: formData.os,
+        url: formData.url,
+        steps_to_reproduce: formData.steps_to_reproduce ? [formData.steps_to_reproduce] : [],
+        expected_result: formData.expected_result,
+        actual_result: formData.actual_result,
+        tags: formData.tags
+      }
+
+      // Create FormData for file uploads
+      const submitData = new FormData()
+      submitData.append('bugData', JSON.stringify(bugData))
+      
+      files.forEach((file, index) => {
+        submitData.append(`file_${index}`, file)
+      })
+
+      const response = await fetch(`/api/test-execution/bugs/${editingBug.id}`, {
+        method: 'PUT',
+        body: submitData
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to update bug report')
+      }
+
+      const result = await response.json()
+      
+      // Update bug in state
+      setBugs(prev => prev.map(bug => 
+        bug.id === editingBug.id ? result.bug : bug
+      ))
+      
+      setShowCreateForm(false)
+      setEditingBug(null)
+      
+      toast.success('Bug report updated successfully!')
+    } catch (error) {
+      console.error('Failed to update bug:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to update bug report')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Handle AI bug created
@@ -336,10 +404,14 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setShowSummaryReport(!showSummaryReport)}
-                  className="hidden sm:inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className={`hidden sm:inline-flex items-center px-3 py-2 border rounded-md shadow-sm text-sm font-medium ${
+                    showSummaryReport 
+                      ? 'border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100' 
+                      : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+                  }`}
                 >
                   <BarChart3 className="w-4 h-4 mr-2" />
-                  Reports
+                  {showSummaryReport ? 'Hide Reports' : 'Reports'}
                 </button>
 
                 <button
@@ -370,15 +442,25 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
         {showCreateForm && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
             <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-5xl shadow-lg rounded-md bg-white">
-              <QuickBugForm
-                onSubmit={handleCreateBug}
+              <EnhancedBugForm
+                onSubmit={editingBug ? handleUpdateBug : handleCreateBug}
                 isLoading={loading}
                 onCancel={() => {
                   setShowCreateForm(false)
+                  setEditingBug(null)
                   setSelectedBug(null)
                 }}
+                editingBug={editingBug}
+                mode={editingBug ? 'edit' : 'create'}
               />
             </div>
+          </div>
+        )}
+
+        {/* Reports Section */}
+        {showSummaryReport && (
+          <div className="mb-8">
+            <HTMLBugReport bugs={bugs} />
           </div>
         )}
 
