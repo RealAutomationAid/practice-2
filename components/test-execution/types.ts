@@ -1,5 +1,17 @@
 import { BugSeverity, BugPriority, BugStatus, WinnersBugReport } from '@/lib/supabase-types'
 
+// Test Project interface for dropdown selection
+export interface TestProjectOption {
+  id: string
+  name: string
+  description?: string
+  created_at: string
+  sut_analysis?: string
+  test_plan?: string
+  requirements?: string
+  more_context?: string
+}
+
 // Extended types for Test Execution module
 export interface BugReportExtended extends WinnersBugReport {
   attachment_count?: number
@@ -23,6 +35,8 @@ export interface CreateBugFormData {
   expected_result: string
   actual_result: string
   tags: string[]
+  test_project_id?: string
+  status: BugStatus
 }
 
 // File upload interfaces

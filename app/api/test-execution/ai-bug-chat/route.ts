@@ -21,6 +21,7 @@ interface RequestBody {
     size: number
     data: string // base64 encoded data
   }[]
+  test_project_id?: string
 }
 
 // Initialize OpenAI client
@@ -175,7 +176,7 @@ function extractBugDataFallback(message: string): any {
 }
 
 // OpenAI-based extraction
-async function extractBugDataWithAI(message: string, conversationHistory: ChatMessage[]): Promise<any> {
+async function extractBugDataWithAI(message: string, conversationHistory: ChatMessage[], systemPrompt: string = SYSTEM_PROMPT): Promise<any> {
   if (!openai) {
     return extractBugDataFallback(message)
   }
@@ -183,7 +184,7 @@ async function extractBugDataWithAI(message: string, conversationHistory: ChatMe
   try {
     // Build conversation context
     const messages = [
-      { role: 'system' as const, content: SYSTEM_PROMPT },
+      { role: 'system' as const, content: systemPrompt },
       ...conversationHistory.slice(-5).map(msg => ({
         role: msg.type === 'user' ? 'user' as const : 'assistant' as const,
         content: msg.content
@@ -238,7 +239,8 @@ async function createBugReport(bugData: any, attachments?: any[]): Promise<strin
       expected_result: bugData.expected_result || '',
       actual_result: bugData.actual_result || '',
       status: 'open',
-      tags: bugData.tags || []
+      tags: bugData.tags || [],
+      test_project_id: bugData.test_project_id || undefined
     }
 
     const { data, error } = await supabase
@@ -254,7 +256,7 @@ async function createBugReport(bugData: any, attachments?: any[]): Promise<strin
 
     const bugId = data.id
 
-    // Handle image attachments if provided
+    // Handle file attachments (images and videos) if provided
     if (attachments && attachments.length > 0) {
       for (const attachment of attachments) {
         try {
@@ -312,7 +314,7 @@ async function createBugReport(bugData: any, attachments?: any[]): Promise<strin
 export async function POST(request: NextRequest) {
   try {
     const body: RequestBody = await request.json()
-    const { message, conversationHistory, attachments } = body
+    const { message, conversationHistory, attachments, test_project_id } = body
 
     if (!message?.trim()) {
       return NextResponse.json(
@@ -321,15 +323,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Fetch test project context if provided
+    let projectContext = ''
+    if (test_project_id) {
+      const { data: project, error } = await supabase
+        .from('winners_test_projects')
+        .select('sut_analysis, test_plan, requirements, testing_types, tools_frameworks, more_context, allocated_hours, number_of_test_cases, risk_matrix_generation')
+        .eq('id', test_project_id)
+        .single()
+      if (project && !error) {
+        projectContext = `\n\nTEST PROJECT CONTEXT:\n` +
+          (project.sut_analysis ? `SUT Analysis: ${project.sut_analysis}\n` : '') +
+          (project.test_plan ? `Test Plan: ${project.test_plan}\n` : '') +
+          (project.requirements ? `Requirements: ${project.requirements}\n` : '') +
+          (project.testing_types ? `Testing Types: ${JSON.stringify(project.testing_types)}\n` : '') +
+          (project.tools_frameworks ? `Tools/Frameworks: ${project.tools_frameworks}\n` : '') +
+          (project.more_context ? `More Context: ${project.more_context}\n` : '') +
+          (project.allocated_hours ? `Allocated Hours: ${project.allocated_hours}\n` : '') +
+          (project.number_of_test_cases ? `Number of Test Cases: ${project.number_of_test_cases}\n` : '') +
+          (project.risk_matrix_generation ? `Risk Matrix Generation: true\n` : '')
+      }
+    }
+
+    // Enhance SYSTEM_PROMPT with project context
+    const systemPromptWithContext = SYSTEM_PROMPT + projectContext
+
     // Extract bug information using AI or fallback
-    const extractionResult = await extractBugDataWithAI(message, conversationHistory)
+    const extractionResult = await extractBugDataWithAI(message, conversationHistory, systemPromptWithContext)
     
     let bugId: string | null = null
     let bugCreated = false
 
     // Create bug report if needed
     if (extractionResult.shouldCreateBug && extractionResult.bugData) {
-      bugId = await createBugReport(extractionResult.bugData, attachments)
+      bugId = await createBugReport({ ...extractionResult.bugData, test_project_id }, attachments)
       bugCreated = !!bugId
       
       if (!bugCreated) {

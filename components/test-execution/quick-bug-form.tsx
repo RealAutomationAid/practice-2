@@ -14,9 +14,10 @@ import {
   Clipboard,
   Send,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Loader2
 } from 'lucide-react'
-import { CreateBugFormData, FileUploadProgress } from './types'
+import { CreateBugFormData, FileUploadProgress, TestProjectOption } from './types'
 import { BugSeverity, BugPriority } from '@/lib/supabase-types'
 import { clipboardUtils, fileUtils } from '@/lib/test-execution-utils'
 
@@ -45,6 +46,9 @@ export function QuickBugForm({ onSubmit, isLoading = false, onCancel }: QuickBug
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const formRef = useRef<HTMLFormElement>(null)
+  const [testProjects, setTestProjects] = useState<TestProjectOption[]>([])
+  const [testProjectsLoading, setTestProjectsLoading] = useState(false)
+  const [testProjectError, setTestProjectError] = useState<string | null>(null)
 
   const {
     register,
@@ -184,6 +188,22 @@ export function QuickBugForm({ onSubmit, isLoading = false, onCancel }: QuickBug
     return <File className="w-4 h-4" />
   }
 
+  // Fetch test projects on mount
+  useEffect(() => {
+    setTestProjectsLoading(true)
+    fetch('/api/test-projects')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setTestProjects(data.data)
+        } else {
+          setTestProjectError('Failed to load test projects')
+        }
+      })
+      .catch(() => setTestProjectError('Failed to load test projects'))
+      .finally(() => setTestProjectsLoading(false))
+  }, [])
+
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-2 mb-6">
@@ -196,6 +216,30 @@ export function QuickBugForm({ onSubmit, isLoading = false, onCancel }: QuickBug
       </div>
 
       <form ref={formRef} onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
+        {/* Test Project Dropdown */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Test Project
+          </label>
+          {testProjectsLoading ? (
+            <div className="flex items-center gap-2 text-gray-500"><Loader2 className="animate-spin w-4 h-4" /> Loading projects...</div>
+          ) : (
+            <select
+              {...register('test_project_id')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              defaultValue=""
+            >
+              <option value="">No Test Project</option>
+              {testProjects.map(project => (
+                <option key={project.id} value={project.id}>
+                  {project.name} ({new Date(project.created_at).toLocaleDateString()})
+                </option>
+              ))}
+            </select>
+          )}
+          {testProjectError && <p className="text-sm text-red-600 mt-1">{testProjectError}</p>}
+        </div>
+
         {/* Title and Description */}
         <div className="grid grid-cols-1 gap-4">
           <div>

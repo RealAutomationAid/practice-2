@@ -14,10 +14,10 @@ import {
 } from 'lucide-react'
 import { QuickBugForm } from './quick-bug-form'
 import { EnhancedBugForm } from './enhanced-bug-form'
-import { SimpleBugGrid } from './simple-bug-grid'
+import { CompactBugTable } from './compact-bug-table'
 import { AIBugChat } from './ai-bug-chat'
 import { HTMLBugReport } from './html-bug-report'
-import { CreateBugFormData, BugReportExtended, BatchOperation, ExportOptions } from './types'
+import { CreateBugFormData, BugReportExtended, BatchOperation, ExportOptions, SearchFilterState } from './types'
 import { WinnersBugReport, BugReportInsert } from '@/lib/supabase-types'
 import { exportUtils, realtimeUtils, keyboardUtils } from '@/lib/test-execution-utils'
 
@@ -40,6 +40,17 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
   const [editingBug, setEditingBug] = useState<BugReportExtended | null>(null)
   const [selectedBug, setSelectedBug] = useState<BugReportExtended | null>(null)
   const [showSummaryReport, setShowSummaryReport] = useState(false)
+  const [filterState, setFilterState] = useState<SearchFilterState>({
+    searchTerm: '',
+    statusFilter: [],
+    severityFilter: [],
+    priorityFilter: [],
+    reporterFilter: [],
+    dateRange: { start: null, end: null },
+    sortBy: 'created_at',
+    sortOrder: 'desc'
+  });
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Load bugs from API
   const loadBugs = useCallback(async () => {
@@ -206,7 +217,8 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
         steps_to_reproduce: formData.steps_to_reproduce ? [formData.steps_to_reproduce] : [],
         expected_result: formData.expected_result,
         actual_result: formData.actual_result,
-        tags: formData.tags
+        tags: formData.tags,
+        status: formData.status
       }
 
       // Create FormData for file uploads
@@ -344,6 +356,12 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
 
   const stats = getSummaryStats()
 
+  // Add handler for advanced filter
+  const handleAdvancedFilterChange = (newFilter: SearchFilterState) => {
+    setFilterState(newFilter);
+    // Optionally, reload bugs from API with new filters
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Toaster 
@@ -466,8 +484,15 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
 
         {/* Data Grid */}
         <div className="space-y-6">
-          <SimpleBugGrid
+          <CompactBugTable
+            data={bugs}
+            loading={loading}
+            totalCount={bugs.length}
             onEdit={handleEditBug}
+            onDelete={handleDeleteBugs}
+            onExport={handleExport}
+            onSearch={handleAdvancedFilterChange}
+            className="mb-6"
           />
         </div>
 

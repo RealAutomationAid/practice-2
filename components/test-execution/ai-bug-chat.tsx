@@ -3,6 +3,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Bot, User, CheckCircle, Loader2, Paperclip, X, Image } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { TestProjectOption } from './types'
+import { ProjectSelector } from './project-selector'
+import { ProjectContextBox } from './project-context-box'
+import { ProjectModal } from './project-modal'
 
 export interface ChatMessage {
   id: string
@@ -39,6 +43,13 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [attachments, setAttachments] = useState<AttachmentFile[]>([])
+  const [testProjects, setTestProjects] = useState<TestProjectOption[]>([])
+  const [testProjectsLoading, setTestProjectsLoading] = useState(false)
+  const [testProjectError, setTestProjectError] = useState<string | null>(null)
+  const [selectedTestProjectId, setSelectedTestProjectId] = useState<string>('')
+  const [selectedProjectContext, setSelectedProjectContext] = useState<string>('')
+  const [projectModalOpen, setProjectModalOpen] = useState(false)
+  const [projectModalEditData, setProjectModalEditData] = useState<any | null>(null)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -80,15 +91,19 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
     if (!files) return
 
     Array.from(files).forEach(file => {
-      // Check file type
-      if (!file.type.startsWith('image/')) {
-        toast.error('Only image files are supported')
+      // Check file type - support images and videos
+      const isImage = file.type.startsWith('image/')
+      const isVideo = file.type.startsWith('video/')
+      
+      if (!isImage && !isVideo) {
+        toast.error('Only image and video files are supported')
         return
       }
 
-      // Check file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('File size must be less than 5MB')
+      // Check file size (50MB limit for videos, 5MB for images)
+      const maxSize = isVideo ? 50 * 1024 * 1024 : 5 * 1024 * 1024
+      if (file.size > maxSize) {
+        toast.error(`File size must be less than ${isVideo ? '50MB' : '5MB'}`)
         return
       }
 
@@ -100,7 +115,7 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
           type: file.type,
           size: file.size,
           data: result,
-          preview: result
+          preview: isImage ? result : undefined // Only set preview for images
         }
         setAttachments(prev => [...prev, newAttachment])
       }
@@ -123,22 +138,26 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
     const items = event.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      if (item.kind === 'file' && item.type.startsWith('image/')) {
+      const isImage = item.type.startsWith('image/')
+      const isVideo = item.type.startsWith('video/')
+      
+      if (item.kind === 'file' && (isImage || isVideo)) {
         const file = item.getAsFile();
         if (file) {
-          if (file.size > 5 * 1024 * 1024) {
-            toast.error('File size must be less than 5MB');
+          const maxSize = isVideo ? 50 * 1024 * 1024 : 5 * 1024 * 1024
+          if (file.size > maxSize) {
+            toast.error(`File size must be less than ${isVideo ? '50MB' : '5MB'}`);
             continue;
           }
           const reader = new FileReader();
           reader.onload = (e) => {
             const result = e.target?.result as string;
             const newAttachment: AttachmentFile = {
-              name: file.name,
+              name: file.name || `pasted-${isVideo ? 'video' : 'image'}-${Date.now()}`,
               type: file.type,
               size: file.size,
               data: result,
-              preview: result
+              preview: isImage ? result : undefined
             };
             setAttachments(prev => [...prev, newAttachment]);
           };
@@ -148,15 +167,104 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
     }
   };
 
+  // Fetch test projects on mount
+  useEffect(() => {
+    setTestProjectsLoading(true)
+    fetch('/api/test-projects')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setTestProjects(data.data)
+        } else {
+          setTestProjectError('Failed to load test projects')
+        }
+      })
+      .catch(() => setTestProjectError('Failed to load test projects'))
+      .finally(() => setTestProjectsLoading(false))
+  }, [])
+
+  // Fetch project context when selection changes
+  useEffect(() => {
+    if (!selectedTestProjectId) {
+      setSelectedProjectContext('')
+      return
+    }
+    setSelectedProjectContext('')
+    fetch(`/api/test-projects?id=${selectedTestProjectId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data && data.data.length > 0) {
+          const p = data.data[0]
+          let context = ''
+          if (p.sut_analysis) context += `SUT Analysis: ${p.sut_analysis}\n`
+          if (p.test_plan) context += `Test Plan: ${p.test_plan}\n`
+          if (p.requirements) context += `Requirements: ${p.requirements}\n`
+          if (p.testing_types) context += `Testing Types: ${JSON.stringify(p.testing_types)}\n`
+          if (p.tools_frameworks) context += `Tools/Frameworks: ${p.tools_frameworks}\n`
+          if (p.more_context) context += `More Context: ${p.more_context}\n`
+          if (p.allocated_hours) context += `Allocated Hours: ${p.allocated_hours}\n`
+          if (p.number_of_test_cases) context += `Number of Test Cases: ${p.number_of_test_cases}\n`
+          if (p.risk_matrix_generation) context += `Risk Matrix Generation: true\n`
+          setSelectedProjectContext(context)
+        }
+      })
+  }, [selectedTestProjectId])
+
+  // Helper to get selected project object
+  const selectedProject = testProjects.find((p) => p.id === selectedTestProjectId) || null;
+
+  // Handlers for project modal
+  const handleOpenCreateProject = () => {
+    setProjectModalEditData(null);
+    setProjectModalOpen(true);
+  };
+  const handleOpenEditProject = (id: string) => {
+    const project = testProjects.find((p) => p.id === id);
+    if (project) {
+      setProjectModalEditData(project);
+      setProjectModalOpen(true);
+    }
+  };
+  const handleProjectModalSuccess = (project: any) => {
+    // Refresh project list after create/edit
+    setTestProjectsLoading(true);
+    fetch('/api/test-projects')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setTestProjects(data.data);
+          // Auto-select new project if created
+          if (!projectModalEditData) {
+            setSelectedTestProjectId(project.id);
+          }
+        }
+      })
+      .finally(() => setTestProjectsLoading(false));
+  };
+
+  // Helper to build system prompt for AI
+  const buildSystemPrompt = () => {
+    if (!selectedProject) {
+      return `You are an expert QA assistant. The user is reporting bugs for a software system. If no project is selected, ask the user to select or create a Test Project for better context. Always ask clarifying questions if the bug report is unclear.`;
+    }
+    return `You are an expert QA assistant helping users report software bugs for the following Test Project. Use the provided context to generate highly relevant, structured bug reports. Always ask clarifying questions if the bug report is unclear.\n\n---\nTest Project Name: ${selectedProject.name || ''}\nDescription: ${selectedProject.description || ''}\nSUT Analysis: ${selectedProject.sut_analysis || ''}\nTest Plan: ${selectedProject.test_plan || ''}\nRequirements: ${selectedProject.requirements || ''}\nMore Context: ${selectedProject.more_context || ''}\n---\nWhen the user describes a bug, extract all relevant details and generate a clear, actionable bug report. If information is missing, ask the user for it. Link every bug to the current Test Project.`;
+  };
+
   // Send message to AI
   const handleSendMessage = async () => {
     if ((!inputMessage.trim() && attachments.length === 0) || isLoading) return
 
-    const messageContent = inputMessage.trim() || 'Uploaded image(s) for bug report'
+    const messageContent = inputMessage.trim() || 'Uploaded file(s) for bug report'
+    const imageCount = attachments.filter(a => a.type.startsWith('image/')).length
+    const videoCount = attachments.filter(a => a.type.startsWith('video/')).length
+    const attachmentSummary = attachments.length > 0 ? 
+      ` (${imageCount > 0 ? `${imageCount} image${imageCount > 1 ? 's' : ''}` : ''}${imageCount > 0 && videoCount > 0 ? ', ' : ''}${videoCount > 0 ? `${videoCount} video${videoCount > 1 ? 's' : ''}` : ''} attached)` 
+      : ''
+    
     const userMessage: ChatMessage = {
       id: `user_${Date.now()}`,
       type: 'user',
-      content: messageContent + (attachments.length > 0 ? ` (${attachments.length} image${attachments.length > 1 ? 's' : ''} attached)` : ''),
+      content: messageContent + attachmentSummary,
       timestamp: new Date().toISOString(),
       attachments: attachments.length > 0 ? [...attachments] : undefined
     }
@@ -176,7 +284,9 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
         body: JSON.stringify({
           message: messageContent,
           conversationHistory: messages,
-          attachments: currentAttachments.length > 0 ? currentAttachments : undefined
+          attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
+          test_project_id: selectedTestProjectId || undefined,
+          systemPrompt: buildSystemPrompt(),
         })
       })
 
@@ -199,7 +309,12 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
 
       // Handle bug creation
       if (data.bugCreated && data.bugId) {
-        toast.success(`Bug report created successfully!${currentAttachments.length > 0 ? ` ${currentAttachments.length} image(s) attached.` : ''}`)
+        const currentImageCount = currentAttachments.filter(a => a.type.startsWith('image/')).length
+        const currentVideoCount = currentAttachments.filter(a => a.type.startsWith('video/')).length
+        const attachmentMsg = currentAttachments.length > 0 ? 
+          ` ${currentImageCount > 0 ? `${currentImageCount} image${currentImageCount > 1 ? 's' : ''}` : ''}${currentImageCount > 0 && currentVideoCount > 0 ? ' and ' : ''}${currentVideoCount > 0 ? `${currentVideoCount} video${currentVideoCount > 1 ? 's' : ''}` : ''} attached.` 
+          : ''
+        toast.success(`Bug report created successfully!${attachmentMsg}`)
         onBugCreated?.(data.bugId)
       }
 
@@ -256,7 +371,26 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
   }
 
   return (
-    <div className={`bg-white rounded-lg shadow-lg border ${className}`}>
+    <div className={`relative flex flex-col h-full ${className}`}>
+      {/* Project Management UI */}
+      <ProjectSelector
+        projects={testProjects}
+        selectedProjectId={selectedTestProjectId}
+        onSelect={setSelectedTestProjectId}
+        onCreate={handleOpenCreateProject}
+        onEdit={handleOpenEditProject}
+        loading={testProjectsLoading}
+      />
+      <ProjectContextBox
+        project={selectedProject}
+        onEdit={() => handleOpenEditProject(selectedTestProjectId)}
+      />
+      <ProjectModal
+        open={projectModalOpen}
+        onClose={() => setProjectModalOpen(false)}
+        onSuccess={handleProjectModalSuccess}
+        initialData={projectModalEditData}
+      />
       {/* Header */}
       <div className="border-b p-4">
         <div className="flex items-center space-x-2">
@@ -267,6 +401,38 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
           Describe bugs naturally and I'll create structured reports for you
         </p>
       </div>
+
+      {/* Test Project Dropdown */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Test Project
+        </label>
+        {testProjectsLoading ? (
+          <div className="flex items-center gap-2 text-gray-500"><Loader2 className="animate-spin w-4 h-4" /> Loading projects...</div>
+        ) : (
+          <select
+            value={selectedTestProjectId}
+            onChange={e => setSelectedTestProjectId(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">No Test Project</option>
+            {testProjects.map(project => (
+              <option key={project.id} value={project.id}>
+                {project.name} ({new Date(project.created_at).toLocaleDateString()})
+              </option>
+            ))}
+          </select>
+        )}
+        {testProjectError && <p className="text-sm text-red-600 mt-1">{testProjectError}</p>}
+      </div>
+
+      {/* Optionally show selected project context */}
+      {selectedProjectContext && (
+        <div className="mb-4 p-2 bg-gray-50 border rounded text-xs whitespace-pre-wrap">
+          <strong>Project Context:</strong> <br />
+          {selectedProjectContext}
+        </div>
+      )}
 
       {/* Messages */}
       <div className="h-96 overflow-y-auto p-4 space-y-4">
@@ -283,14 +449,31 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
                   </div>
                   {message.attachments && message.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {message.attachments.map((attachment, idx) => (
-                        <img
-                          key={idx}
-                          src={attachment.preview || attachment.data}
-                          alt={attachment.name}
-                          className="w-20 h-20 object-cover rounded border"
-                        />
-                      ))}
+                      {message.attachments.map((attachment, idx) => 
+                        attachment.type.startsWith('image/') ? (
+                          <img
+                            key={idx}
+                            src={attachment.preview || attachment.data}
+                            alt={attachment.name}
+                            className="w-20 h-20 object-cover rounded border cursor-pointer"
+                            onClick={() => window.open(attachment.data, '_blank')}
+                          />
+                        ) : (
+                          <div 
+                            key={idx}
+                            className="w-20 h-20 bg-gray-100 rounded border flex flex-col items-center justify-center cursor-pointer hover:bg-gray-200"
+                            onClick={() => {
+                              const link = document.createElement('a')
+                              link.href = attachment.data
+                              link.download = attachment.name
+                              link.click()
+                            }}
+                          >
+                            <div className="text-lg">🎬</div>
+                            <div className="text-xs text-gray-600">Video</div>
+                          </div>
+                        )
+                      )}
                     </div>
                   )}
                   {message.bugCreated && (
@@ -332,11 +515,20 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
             {attachments.map((attachment, index) => (
               <div key={index} className="relative">
                 <div className="relative w-20 h-20 rounded-lg overflow-hidden border-2 border-gray-200">
-                  <img
-                    src={attachment.preview}
-                    alt={attachment.name}
-                    className="w-full h-full object-cover"
-                  />
+                  {attachment.type.startsWith('image/') ? (
+                    <img
+                      src={attachment.preview}
+                      alt={attachment.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-2xl mb-1">🎬</div>
+                        <div className="text-xs text-gray-600">Video</div>
+                      </div>
+                    </div>
+                  )}
                   <button
                     onClick={() => removeAttachment(index)}
                     className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
@@ -374,7 +566,7 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept="image/*"
+                  accept="image/*,video/*"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -382,7 +574,7 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isLoading}
                   className="text-gray-500 hover:text-gray-700 disabled:opacity-50 transition-colors"
-                  title="Attach images"
+                  title="Attach images or videos"
                 >
                   <Paperclip className="w-4 h-4" />
                 </button>

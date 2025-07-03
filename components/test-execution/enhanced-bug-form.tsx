@@ -15,10 +15,11 @@ import {
   Send,
   AlertCircle,
   CheckCircle,
-  Edit
+  Edit,
+  Loader2
 } from 'lucide-react'
-import { CreateBugFormData, FileUploadProgress, BugReportExtended } from './types'
-import { BugSeverity, BugPriority } from '@/lib/supabase-types'
+import { CreateBugFormData, FileUploadProgress, BugReportExtended, TestProjectOption } from './types'
+import { BugSeverity, BugPriority, BugStatus } from '@/lib/supabase-types'
 import { clipboardUtils, fileUtils } from '@/lib/test-execution-utils'
 
 interface EnhancedBugFormProps {
@@ -43,6 +44,14 @@ const PRIORITY_OPTIONS: { value: BugPriority; label: string; color: string }[] =
   { value: 'urgent', label: 'Urgent', color: 'bg-red-100 text-red-800' }
 ]
 
+const STATUS_OPTIONS: { value: BugStatus; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'resolved', label: 'Resolved' },
+  { value: 'closed', label: 'Closed' },
+  { value: 'duplicate', label: 'Duplicate' },
+]
+
 export function EnhancedBugForm({ 
   onSubmit, 
   isLoading = false, 
@@ -55,6 +64,9 @@ export function EnhancedBugForm({
   const [tagInput, setTagInput] = useState('')
   const formRef = useRef<HTMLFormElement>(null)
   const isEditMode = mode === 'edit' && editingBug
+  const [testProjects, setTestProjects] = useState<TestProjectOption[]>([])
+  const [testProjectsLoading, setTestProjectsLoading] = useState(false)
+  const [testProjectError, setTestProjectError] = useState<string | null>(null)
 
   const {
     register,
@@ -68,7 +80,8 @@ export function EnhancedBugForm({
       severity: 'medium',
       priority: 'medium',
       environment: 'production',
-      tags: []
+      tags: [],
+      status: 'open',
     }
   })
 
@@ -105,9 +118,10 @@ export function EnhancedBugForm({
       setValue('steps_to_reproduce', bug.steps_to_reproduce?.join('\n') || '')
       setValue('expected_result', bug.expected_result || '')
       setValue('actual_result', bug.actual_result || '')
+      setValue('status', bug.status || 'open')
       
       // Set tags
-      const bugTags = parseTags(bug.tags)
+      const bugTags = parseTags(bug.tags || null)
       setTags(bugTags)
     } else {
       // Auto-detect browser and OS for create mode
@@ -211,7 +225,7 @@ export function EnhancedBugForm({
   // Handle form submission
   const onFormSubmit = async (data: CreateBugFormData) => {
     try {
-      const formData = { ...data, tags }
+      const formData = { ...data, tags, status: data.status }
       const files = uploadedFiles.map(f => f.file)
       await onSubmit(formData, files)
       
@@ -244,6 +258,22 @@ export function EnhancedBugForm({
   const submitIcon = isEditMode ? <Edit className="w-4 h-4" /> : <Send className="w-4 h-4" />
   const loadingText = isEditMode ? 'Updating...' : 'Creating...'
 
+  // Fetch test projects on mount
+  useEffect(() => {
+    setTestProjectsLoading(true)
+    fetch('/api/test-projects')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setTestProjects(data.data)
+        } else {
+          setTestProjectError('Failed to load test projects')
+        }
+      })
+      .catch(() => setTestProjectError('Failed to load test projects'))
+      .finally(() => setTestProjectsLoading(false))
+  }, [])
+
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-2 mb-6">
@@ -263,6 +293,30 @@ export function EnhancedBugForm({
       </div>
 
       <form ref={formRef} onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
+        {/* Test Project Dropdown */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Test Project
+          </label>
+          {testProjectsLoading ? (
+            <div className="flex items-center gap-2 text-gray-500"><Loader2 className="animate-spin w-4 h-4" /> Loading projects...</div>
+          ) : (
+            <select
+              {...register('test_project_id')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              defaultValue=""
+            >
+              <option value="">No Test Project</option>
+              {testProjects.map(project => (
+                <option key={project.id} value={project.id}>
+                  {project.name} ({new Date(project.created_at).toLocaleDateString()})
+                </option>
+              ))}
+            </select>
+          )}
+          {testProjectError && <p className="text-sm text-red-600 mt-1">{testProjectError}</p>}
+        </div>
+
         {/* Title and Description */}
         <div className="grid grid-cols-1 gap-4">
           <div>
@@ -329,6 +383,25 @@ export function EnhancedBugForm({
             </select>
           </div>
         </div>
+
+        {/* Status */}
+        {isEditMode && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              {...register('status')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {STATUS_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Reporter Information */}
         <div className="grid grid-cols-2 gap-4">

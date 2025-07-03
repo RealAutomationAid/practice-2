@@ -77,10 +77,10 @@ export function BugDetailModal({ bug, isOpen, onClose, onEdit }: BugDetailModalP
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <AlertCircle className="w-6 h-6 text-red-600" />
-            <h2 className="text-xl font-semibold text-gray-900">Bug Report Details</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Bug Report Details</h2>
           </div>
           <div className="flex items-center gap-2">
             {onEdit && (
@@ -101,11 +101,11 @@ export function BugDetailModal({ bug, isOpen, onClose, onEdit }: BugDetailModalP
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
-          <div className="space-y-6">
+        <div className="p-4 overflow-y-auto max-h-[80vh]">
+          <div className="space-y-3">
             {/* Title and Status */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">{bug.title}</h3>
+              <h3 className="text-base font-medium text-gray-900 mb-1">{bug.title}</h3>
               <div className="flex items-center gap-3">
                 <Badge value={bug.status || 'open'} type="status" />
                 <Badge value={bug.severity || 'low'} type="severity" />

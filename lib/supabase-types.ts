@@ -32,6 +32,11 @@ export interface Database {
         Insert: AttachmentInsert
         Update: AttachmentUpdate
       }
+      winners_test_projects: {
+        Row: WinnersTestProject
+        Insert: TestProjectInsert
+        Update: TestProjectUpdate
+      }
     }
     Views: {
       [_ in never]: never
@@ -74,6 +79,7 @@ export interface WinnersBugReport {
   actual_result?: string
   attachments?: Json
   tags?: string[]
+  test_project_id?: string
   created_at?: string
   updated_at?: string
   resolved_at?: string
@@ -109,6 +115,25 @@ export interface WinnersAttachment {
   uploaded_at?: string
 }
 
+export interface WinnersTestProject {
+  id: string
+  name: string
+  description?: string
+  sut_analysis?: string
+  test_plan?: string
+  requirements?: string
+  testing_types?: Json
+  tools_frameworks?: string
+  more_context?: string
+  allocated_hours?: number
+  number_of_test_cases?: number
+  risk_matrix_generation?: boolean
+  created_by_email?: string
+  created_at?: string
+  updated_at?: string
+  is_active?: boolean
+}
+
 // Insert types for creating new records
 export type BugReportInsert = Omit<WinnersBugReport, 'id' | 'created_at' | 'updated_at'> & {
   id?: string
@@ -131,11 +156,18 @@ export type AttachmentInsert = Omit<WinnersAttachment, 'id' | 'uploaded_at'> & {
   uploaded_at?: string
 }
 
+export type TestProjectInsert = Omit<WinnersTestProject, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string
+  created_at?: string
+  updated_at?: string
+}
+
 // Update types for updating existing records
 export type BugReportUpdate = Partial<WinnersBugReport>
 export type TestSessionUpdate = Partial<WinnersTestSession>
 export type SessionBugUpdate = Partial<WinnersSessionBug>
 export type AttachmentUpdate = Partial<WinnersAttachment>
+export type TestProjectUpdate = Partial<WinnersTestProject>
 
 // Form data interfaces for UI components
 export interface BugReportFormData {
