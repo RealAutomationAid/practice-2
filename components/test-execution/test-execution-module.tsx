@@ -20,6 +20,10 @@ import { HTMLBugReport } from './html-bug-report'
 import { CreateBugFormData, BugReportExtended, BatchOperation, ExportOptions, SearchFilterState, TestProjectOption } from './types'
 import { WinnersBugReport, BugReportInsert } from '@/lib/supabase-types'
 import { exportUtils, realtimeUtils, keyboardUtils } from '@/lib/test-execution-utils'
+import { UnifiedProjectSelector } from './unified-project-selector'
+import { ProjectDetailDialog } from './project-detail-dialog'
+import { ProjectDeleteConfirmDialog } from './project-delete-confirm-dialog'
+import { ProjectModal } from './project-modal'
 
 // Keyboard shortcuts
 const KEYBOARD_SHORTCUTS = [
@@ -54,6 +58,10 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
     sortOrder: 'desc'
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [projectDetailOpen, setProjectDetailOpen] = useState(false)
+  const [projectDeleteOpen, setProjectDeleteOpen] = useState(false)
+  const [projectModalOpen, setProjectModalOpen] = useState(false)
+  const [projectModalEditData, setProjectModalEditData] = useState<any | null>(null)
 
   // Load bugs from API
   const loadBugs = useCallback(async () => {
@@ -106,6 +114,8 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
 
   // Reload bugs when project selection changes
   useEffect(() => {
+    // Clear current bugs immediately to prevent showing wrong project data
+    setBugs([])
     loadBugs()
   }, [selectedProjectId, loadBugs])
 
@@ -113,6 +123,15 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
   useEffect(() => {
     const unsubscribeBugs = realtimeUtils.subscribeToBugReports((payload) => {
       console.log('Real-time update:', payload)
+      
+      // Only process updates for bugs in the selected project or when no project is selected
+      const bugProjectId = payload.new?.test_project_id || payload.old?.test_project_id
+      const shouldProcess = !selectedProjectId || bugProjectId === selectedProjectId
+      
+      if (!shouldProcess) {
+        console.log('Skipping real-time update - bug belongs to different project')
+        return
+      }
       
       if (payload.eventType === 'INSERT') {
         setBugs(prev => [payload.new, ...prev])
@@ -131,7 +150,7 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
     return () => {
       unsubscribeBugs()
     }
-  }, [])
+  }, [selectedProjectId])
 
   // Setup global keyboard shortcuts
   useEffect(() => {
@@ -294,7 +313,7 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
 
   // Handle AI bug created
   const handleAIBugCreated = (bugId: string) => {
-    // Refresh the bug list to show the new bug
+    // Refresh the bug list to show the new bug with current project filter
     loadBugs()
   }
 
@@ -366,7 +385,8 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
         includeAttachments: false
       }
 
-      const csvContent = await exportUtils.exportBugsToCSV(bugs, options)
+      const bugsToExport = getFilteredBugs()
+      const csvContent = await exportUtils.exportBugsToCSV(bugsToExport, options)
       const filename = exportUtils.generateExportFilename('bug-reports')
       
       exportUtils.downloadCSV(csvContent, filename)
@@ -377,24 +397,108 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
     }
   }
 
+  // Filter bugs by selected project (defensive filtering)
+  const getFilteredBugs = () => {
+    if (!selectedProjectId) {
+      return bugs
+    }
+    return bugs.filter(bug => bug.test_project_id === selectedProjectId)
+  }
+
   // Get summary statistics
   const getSummaryStats = () => {
-    const total = bugs.length
-    const open = bugs.filter(bug => bug.status === 'open').length
-    const inProgress = bugs.filter(bug => bug.status === 'in_progress').length
-    const resolved = bugs.filter(bug => bug.status === 'resolved').length
-    const closed = bugs.filter(bug => bug.status === 'closed').length
+    const filteredBugs = getFilteredBugs()
+    const total = filteredBugs.length
+    const open = filteredBugs.filter(bug => bug.status === 'open').length
+    const inProgress = filteredBugs.filter(bug => bug.status === 'in_progress').length
+    const resolved = filteredBugs.filter(bug => bug.status === 'resolved').length
+    const closed = filteredBugs.filter(bug => bug.status === 'closed').length
 
     return { total, open, inProgress, resolved, closed }
   }
 
   const stats = getSummaryStats()
+  const filteredBugs = getFilteredBugs()
 
   // Add handler for advanced filter
   const handleAdvancedFilterChange = (newFilter: SearchFilterState) => {
     setFilterState(newFilter);
     // Optionally, reload bugs from API with new filters
   };
+
+  // Project management handlers
+  const handleOpenCreateProject = () => {
+    setProjectModalEditData(null);
+    setProjectModalOpen(true);
+  };
+  
+  const handleOpenEditProject = (id: string) => {
+    const project = testProjects.find((p) => p.id === id);
+    if (project) {
+      setProjectModalEditData(project);
+      setProjectModalOpen(true);
+    }
+  };
+  
+  const handleViewProject = (id: string) => {
+    setProjectDetailOpen(true);
+  };
+  
+  const handleProjectModalSuccess = (project: any) => {
+    // Refresh project list after create/edit
+    loadTestProjects();
+    // Auto-select new project if created
+    if (!projectModalEditData) {
+      setSelectedProjectId(project.id);
+    }
+  };
+
+  const handleProjectDelete = async (projectId: string) => {
+    const response = await fetch(`/api/test-projects/${projectId}`, {
+      method: 'DELETE'
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to delete project');
+    }
+    
+    // Refresh project list and clear selection if deleted project was selected
+    if (selectedProjectId === projectId) {
+      setSelectedProjectId('');
+    }
+    
+    loadTestProjects();
+  };
+
+  const handleProjectDuplicate = async (project: TestProjectOption) => {
+    const duplicateData = {
+      name: `${project.name} (Copy)`,
+      description: project.description,
+      sut_analysis: project.sut_analysis,
+      test_plan: project.test_plan,
+      requirements: project.requirements,
+      more_context: project.more_context
+    };
+    
+    try {
+      const response = await fetch('/api/test-projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(duplicateData)
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        handleProjectModalSuccess(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to duplicate project:', error);
+      throw error;
+    }
+  };
+
+  const selectedProject = testProjects.find((p) => p.id === selectedProjectId) || null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -432,27 +536,18 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* Project Selector */}
-              <div className="min-w-[200px]">
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Filter by Project
-                </label>
-                {testProjectsLoading ? (
-                  <div className="text-sm text-gray-500">Loading...</div>
-                ) : (
-                  <select
-                    value={selectedProjectId}
-                    onChange={(e) => setSelectedProjectId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  >
-                    <option value="">All Projects</option>
-                    {testProjects.map(project => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
+              {/* Unified Project Selector */}
+              <div className="min-w-[280px]">
+                <UnifiedProjectSelector
+                  projects={testProjects}
+                  selectedProjectId={selectedProjectId}
+                  onSelect={setSelectedProjectId}
+                  onCreate={handleOpenCreateProject}
+                  onEdit={handleOpenEditProject}
+                  onView={handleViewProject}
+                  loading={testProjectsLoading}
+                  showProjectInfo={true}
+                />
               </div>
 
               {/* Summary Stats */}
@@ -535,16 +630,16 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
         {/* Reports Section */}
         {showSummaryReport && (
           <div className="mb-8">
-            <HTMLBugReport bugs={bugs} />
+            <HTMLBugReport bugs={filteredBugs} />
           </div>
         )}
 
         {/* Data Grid */}
         <div className="space-y-6">
           <CompactBugTable
-            data={bugs}
+            data={filteredBugs}
             loading={loading}
-            totalCount={bugs.length}
+            totalCount={filteredBugs.length}
             onEdit={handleEditBug}
             onDelete={handleDeleteBugs}
             onExport={handleExport}
@@ -579,6 +674,36 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
           </div>
         </div>
       </div>
+
+      {/* Project Management Modals */}
+      <ProjectModal
+        open={projectModalOpen}
+        onClose={() => setProjectModalOpen(false)}
+        onSuccess={handleProjectModalSuccess}
+        initialData={projectModalEditData}
+      />
+      
+      <ProjectDetailDialog
+        project={selectedProject}
+        isOpen={projectDetailOpen}
+        onClose={() => setProjectDetailOpen(false)}
+        onEdit={() => {
+          setProjectDetailOpen(false)
+          handleOpenEditProject(selectedProjectId)
+        }}
+        onDelete={() => {
+          setProjectDetailOpen(false)
+          setProjectDeleteOpen(true)
+        }}
+        onDuplicate={handleProjectDuplicate}
+      />
+      
+      <ProjectDeleteConfirmDialog
+        project={selectedProject}
+        isOpen={projectDeleteOpen}
+        onClose={() => setProjectDeleteOpen(false)}
+        onConfirm={handleProjectDelete}
+      />
     </div>
   )
 } 

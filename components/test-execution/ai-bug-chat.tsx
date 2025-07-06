@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Bot, User, CheckCircle, Loader2, Paperclip, X, Image } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { TestProjectOption } from './types'
-import { ProjectSelector } from './project-selector'
+import { UnifiedProjectSelector } from './unified-project-selector'
 import { ProjectInfoChip } from './project-info-chip'
 import { ProjectDetailDialog } from './project-detail-dialog'
 import { ProjectDeleteConfirmDialog } from './project-delete-confirm-dialog'
@@ -430,13 +430,16 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
   return (
     <div className={`relative flex flex-col h-full ${className}`}>
       {/* Project Management UI */}
-      <ProjectSelector
+      <UnifiedProjectSelector
         projects={testProjects}
         selectedProjectId={selectedTestProjectId}
         onSelect={setSelectedTestProjectId}
         onCreate={handleOpenCreateProject}
         onEdit={handleOpenEditProject}
+        onView={() => setProjectDetailOpen(true)}
         loading={testProjectsLoading}
+        showProjectInfo={false}
+        className="mb-4"
       />
       
       {/* Project Info Chip */}

@@ -136,7 +136,7 @@ export function ProjectDetailDialog({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
           <div className="flex items-start justify-between">
@@ -231,7 +231,7 @@ export function ProjectDetailDialog({
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto max-h-[60vh] p-6">
+        <div className="overflow-y-auto flex-1 p-6 min-h-0">
           {activeTab === 'overview' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -298,19 +298,27 @@ export function ProjectDetailDialog({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 p-4 bg-gray-50">
+        <div className="border-t border-gray-200 p-4 bg-gray-50 flex-shrink-0">
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-500">
               <span>Project ID: {project.id}</span>
               <span className="mx-2">•</span>
               <span>Created {formatDate(project.created_at)}</span>
             </div>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Close
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onEdit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Edit Project
+              </button>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       </div>
