@@ -216,37 +216,46 @@ function TestingChatInterface({ className }: TestingChatInterfaceProps) {
   };
 
   return (
-    <div className={cn("flex h-[800px] bg-background border rounded-lg overflow-hidden", className)}>
-      <TestPlanSidebar
-        activeTestPlan={activeTestPlan}
-        onTestPlanSelect={handleTestPlanSelect}
-      />
+    <div className={cn("relative flex h-[900px] overflow-hidden", className)}>
+      {/* Animated background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20">
+        <div className="absolute inset-0 opacity-40" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e2e8f0' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+        }}></div>
+      </div>
       
-      <MainInputArea
-        activeTestPlan={activeTestPlan}
-        sutAnalysisInput={sutAnalysisInput}
-        onSutAnalysisChange={(value) => handleInputChange(setSutAnalysisInput, value)}
-        testPlanInput={testPlanInput}
-        onTestPlanChange={(value) => handleInputChange(setTestPlanInput, value)}
-        requirementsInput={requirementsInput}
-        onRequirementsChange={(value) => handleInputChange(setRequirementsInput, value)}
-        riskMatrixGeneration={riskMatrixGeneration}
-        onRiskMatrixChange={(checked) => setRiskMatrixGeneration(checked)}
-        numberOfTestCases={numberOfTestCases}
-        onNumberOfTestCasesChange={(value) => handleInputChange(setNumberOfTestCases, value)}
-        emailAddress={emailAddress}
-        onEmailAddressChange={(value) => handleInputChange(setEmailAddress, value)}
-        submitError={submitError}
-        isSubmitting={isSubmitting}
-        isFormValid={isFormValid()}
-        onSubmit={handleSubmit}
-      />
-      
-{activeTestPlan === 'test-plan' && (
-        <TestingTypesPanel
-          testingTypes={testingTypes}
-          onTestingTypeChange={handleTestingTypeChange}
-          toolsFrameworks={toolsFrameworks}
+      {/* Main layout */}
+      <div className="relative flex w-full backdrop-blur-xl bg-white/30 border border-white/20 rounded-3xl shadow-2xl overflow-hidden">
+        <TestPlanSidebar
+          activeTestPlan={activeTestPlan}
+          onTestPlanSelect={handleTestPlanSelect}
+        />
+        
+        <MainInputArea
+          activeTestPlan={activeTestPlan}
+          sutAnalysisInput={sutAnalysisInput}
+          onSutAnalysisChange={(value) => handleInputChange(setSutAnalysisInput, value)}
+          testPlanInput={testPlanInput}
+          onTestPlanChange={(value) => handleInputChange(setTestPlanInput, value)}
+          requirementsInput={requirementsInput}
+          onRequirementsChange={(value) => handleInputChange(setRequirementsInput, value)}
+          riskMatrixGeneration={riskMatrixGeneration}
+          onRiskMatrixChange={(checked) => setRiskMatrixGeneration(checked)}
+          numberOfTestCases={numberOfTestCases}
+          onNumberOfTestCasesChange={(value) => handleInputChange(setNumberOfTestCases, value)}
+          emailAddress={emailAddress}
+          onEmailAddressChange={(value) => handleInputChange(setEmailAddress, value)}
+          submitError={submitError}
+          isSubmitting={isSubmitting}
+          isFormValid={isFormValid()}
+          onSubmit={handleSubmit}
+        />
+        
+        {activeTestPlan === 'test-plan' && (
+          <TestingTypesPanel
+            testingTypes={testingTypes}
+            onTestingTypeChange={handleTestingTypeChange}
+            toolsFrameworks={toolsFrameworks}
           onToolsFrameworksChange={(value) => handleInputChange(setToolsFrameworks, value)}
           moreContext={moreContext}
           onMoreContextChange={(value) => handleInputChange(setMoreContext, value)}
@@ -256,6 +265,7 @@ function TestingChatInterface({ className }: TestingChatInterfaceProps) {
           onEmailAddressChange={(value) => handleInputChange(setEmailAddress, value)}
         />
       )}
+      </div>
     </div>
   );
 }

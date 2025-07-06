@@ -5,7 +5,9 @@ import { Send, Bot, User, CheckCircle, Loader2, Paperclip, X, Image } from 'luci
 import { toast } from 'react-hot-toast'
 import { TestProjectOption } from './types'
 import { ProjectSelector } from './project-selector'
-import { ProjectContextBox } from './project-context-box'
+import { ProjectInfoChip } from './project-info-chip'
+import { ProjectDetailDialog } from './project-detail-dialog'
+import { ProjectDeleteConfirmDialog } from './project-delete-confirm-dialog'
 import { ProjectModal } from './project-modal'
 
 export interface ChatMessage {
@@ -50,6 +52,8 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
   const [selectedProjectContext, setSelectedProjectContext] = useState<string>('')
   const [projectModalOpen, setProjectModalOpen] = useState(false)
   const [projectModalEditData, setProjectModalEditData] = useState<any | null>(null)
+  const [projectDetailOpen, setProjectDetailOpen] = useState(false)
+  const [projectDeleteOpen, setProjectDeleteOpen] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -242,6 +246,59 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
       .finally(() => setTestProjectsLoading(false));
   };
 
+  const handleProjectDelete = async (projectId: string) => {
+    const response = await fetch(`/api/test-projects/${projectId}`, {
+      method: 'DELETE'
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to delete project');
+    }
+    
+    // Refresh project list and clear selection if deleted project was selected
+    setTestProjectsLoading(true);
+    if (selectedTestProjectId === projectId) {
+      setSelectedTestProjectId('');
+    }
+    
+    fetch('/api/test-projects')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setTestProjects(data.data);
+        }
+      })
+      .finally(() => setTestProjectsLoading(false));
+  };
+
+  const handleProjectDuplicate = async (project: TestProjectOption) => {
+    const duplicateData = {
+      name: `${project.name} (Copy)`,
+      description: project.description,
+      sut_analysis: project.sut_analysis,
+      test_plan: project.test_plan,
+      requirements: project.requirements,
+      more_context: project.more_context
+    };
+    
+    try {
+      const response = await fetch('/api/test-projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(duplicateData)
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        handleProjectModalSuccess(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to duplicate project:', error);
+      throw error;
+    }
+  };
+
   // Helper to build system prompt for AI
   const buildSystemPrompt = () => {
     if (!selectedProject) {
@@ -381,15 +438,45 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
         onEdit={handleOpenEditProject}
         loading={testProjectsLoading}
       />
-      <ProjectContextBox
-        project={selectedProject}
-        onEdit={() => handleOpenEditProject(selectedTestProjectId)}
-      />
+      
+      {/* Project Info Chip */}
+      {selectedProject && (
+        <div className="mb-4">
+          <ProjectInfoChip
+            project={selectedProject}
+            onClick={() => setProjectDetailOpen(true)}
+          />
+        </div>
+      )}
+
+      {/* Project Modals */}
       <ProjectModal
         open={projectModalOpen}
         onClose={() => setProjectModalOpen(false)}
         onSuccess={handleProjectModalSuccess}
         initialData={projectModalEditData}
+      />
+      
+      <ProjectDetailDialog
+        project={selectedProject}
+        isOpen={projectDetailOpen}
+        onClose={() => setProjectDetailOpen(false)}
+        onEdit={() => {
+          setProjectDetailOpen(false)
+          handleOpenEditProject(selectedTestProjectId)
+        }}
+        onDelete={() => {
+          setProjectDetailOpen(false)
+          setProjectDeleteOpen(true)
+        }}
+        onDuplicate={handleProjectDuplicate}
+      />
+      
+      <ProjectDeleteConfirmDialog
+        project={selectedProject}
+        isOpen={projectDeleteOpen}
+        onClose={() => setProjectDeleteOpen(false)}
+        onConfirm={handleProjectDelete}
       />
       {/* Header */}
       <div className="border-b p-4">
@@ -402,37 +489,6 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
         </p>
       </div>
 
-      {/* Test Project Dropdown */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Test Project
-        </label>
-        {testProjectsLoading ? (
-          <div className="flex items-center gap-2 text-gray-500"><Loader2 className="animate-spin w-4 h-4" /> Loading projects...</div>
-        ) : (
-          <select
-            value={selectedTestProjectId}
-            onChange={e => setSelectedTestProjectId(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">No Test Project</option>
-            {testProjects.map(project => (
-              <option key={project.id} value={project.id}>
-                {project.name} ({new Date(project.created_at).toLocaleDateString()})
-              </option>
-            ))}
-          </select>
-        )}
-        {testProjectError && <p className="text-sm text-red-600 mt-1">{testProjectError}</p>}
-      </div>
-
-      {/* Optionally show selected project context */}
-      {selectedProjectContext && (
-        <div className="mb-4 p-2 bg-gray-50 border rounded text-xs whitespace-pre-wrap">
-          <strong>Project Context:</strong> <br />
-          {selectedProjectContext}
-        </div>
-      )}
 
       {/* Messages */}
       <div className="h-96 overflow-y-auto p-4 space-y-4">

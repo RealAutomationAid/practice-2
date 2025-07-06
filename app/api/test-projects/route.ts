@@ -114,4 +114,43 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 })
   }
+}
+
+// DELETE endpoint: Delete a test project
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Project ID is required' }, { status: 400 })
+    }
+
+    // First, update any bugs that reference this project to remove the association
+    const { error: bugUpdateError } = await supabase
+      .from('winners_bug_reports')
+      .update({ test_project_id: null })
+      .eq('test_project_id', id)
+
+    if (bugUpdateError) {
+      console.error('Error updating bug reports:', bugUpdateError)
+      return NextResponse.json({ success: false, error: 'Failed to update associated bug reports' }, { status: 500 })
+    }
+
+    // Then delete the project
+    const { error: deleteError } = await supabase
+      .from('winners_test_projects')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) {
+      console.error('Error deleting project:', deleteError)
+      return NextResponse.json({ success: false, error: deleteError.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, message: 'Project deleted successfully' })
+  } catch (error) {
+    console.error('DELETE error:', error)
+    return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 })
+  }
 } 

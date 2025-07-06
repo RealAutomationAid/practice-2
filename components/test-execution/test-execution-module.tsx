@@ -17,7 +17,7 @@ import { EnhancedBugForm } from './enhanced-bug-form'
 import { CompactBugTable } from './compact-bug-table'
 import { AIBugChat } from './ai-bug-chat'
 import { HTMLBugReport } from './html-bug-report'
-import { CreateBugFormData, BugReportExtended, BatchOperation, ExportOptions, SearchFilterState } from './types'
+import { CreateBugFormData, BugReportExtended, BatchOperation, ExportOptions, SearchFilterState, TestProjectOption } from './types'
 import { WinnersBugReport, BugReportInsert } from '@/lib/supabase-types'
 import { exportUtils, realtimeUtils, keyboardUtils } from '@/lib/test-execution-utils'
 
@@ -40,6 +40,9 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
   const [editingBug, setEditingBug] = useState<BugReportExtended | null>(null)
   const [selectedBug, setSelectedBug] = useState<BugReportExtended | null>(null)
   const [showSummaryReport, setShowSummaryReport] = useState(false)
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [testProjects, setTestProjects] = useState<TestProjectOption[]>([])
+  const [testProjectsLoading, setTestProjectsLoading] = useState(false)
   const [filterState, setFilterState] = useState<SearchFilterState>({
     searchTerm: '',
     statusFilter: [],
@@ -56,7 +59,12 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
   const loadBugs = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/test-execution/bugs')
+      const url = new URL('/api/test-execution/bugs', window.location.origin)
+      if (selectedProjectId) {
+        url.searchParams.set('test_project_id', selectedProjectId)
+      }
+      
+      const response = await fetch(url.toString())
       if (!response.ok) throw new Error('Failed to fetch bugs')
       
       const data = await response.json()
@@ -67,14 +75,39 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
     } finally {
       setLoading(false)
     }
+  }, [selectedProjectId])
+
+  // Load test projects
+  const loadTestProjects = useCallback(async () => {
+    setTestProjectsLoading(true)
+    try {
+      const response = await fetch('/api/test-projects')
+      if (!response.ok) throw new Error('Failed to fetch test projects')
+      
+      const data = await response.json()
+      if (data.success) {
+        setTestProjects(data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to load test projects:', error)
+      toast.error('Failed to load test projects')
+    } finally {
+      setTestProjectsLoading(false)
+    }
   }, [])
 
   // Load initial data
   useEffect(() => {
+    loadTestProjects()
     if (initialData.length === 0) {
       loadBugs()
     }
-  }, [initialData.length, loadBugs])
+  }, [initialData.length, loadBugs, loadTestProjects])
+
+  // Reload bugs when project selection changes
+  useEffect(() => {
+    loadBugs()
+  }, [selectedProjectId, loadBugs])
 
   // Setup real-time subscriptions
   useEffect(() => {
@@ -152,6 +185,7 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
         expected_result: formData.expected_result,
         actual_result: formData.actual_result,
         tags: formData.tags,
+        test_project_id: selectedProjectId || undefined,
         status: 'open'
       }
 
@@ -398,6 +432,29 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
             </div>
 
             <div className="flex items-center space-x-4">
+              {/* Project Selector */}
+              <div className="min-w-[200px]">
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Filter by Project
+                </label>
+                {testProjectsLoading ? (
+                  <div className="text-sm text-gray-500">Loading...</div>
+                ) : (
+                  <select
+                    value={selectedProjectId}
+                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="">All Projects</option>
+                    {testProjects.map(project => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
               {/* Summary Stats */}
               <div className="hidden lg:flex items-center space-x-6 text-sm">
                 <div className="text-center">

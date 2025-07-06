@@ -27,6 +27,7 @@ interface BugQueryParams {
   endDate?: string
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
+  test_project_id?: string
 }
 
 // GET - Fetch bug reports with advanced filtering, search, and pagination
@@ -77,7 +78,8 @@ export async function GET(request: NextRequest) {
       startDate: searchParams.get('startDate') || undefined,
       endDate: searchParams.get('endDate') || undefined,
       sortBy,
-      sortOrder
+      sortOrder,
+      test_project_id: searchParams.get('test_project_id') || undefined
     }
 
     // Build the base query
@@ -123,6 +125,11 @@ export async function GET(request: NextRequest) {
       const endDate = new Date(params.endDate)
       endDate.setDate(endDate.getDate() + 1)
       query = query.lt('created_at', endDate.toISOString())
+    }
+
+    // Apply test project filter
+    if (params.test_project_id) {
+      query = query.eq('test_project_id', params.test_project_id)
     }
 
     // Apply sorting
