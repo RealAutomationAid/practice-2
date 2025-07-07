@@ -1,4 +1,4 @@
-import { BugSeverity, BugPriority, BugStatus, WinnersBugReport } from '@/lib/supabase-types'
+import { BugSeverity, BugPriority, BugStatus, WinnersBugReport, Json } from '@/lib/supabase-types'
 
 // Test Project interface for dropdown selection
 export interface TestProjectOption {
@@ -6,10 +6,18 @@ export interface TestProjectOption {
   name: string
   description?: string
   created_at: string
+  created_by_email?: string
+  updated_at?: string
   sut_analysis?: string
   test_plan?: string
   requirements?: string
   more_context?: string
+  testing_types?: Json
+  tools_frameworks?: string
+  allocated_hours?: number
+  number_of_test_cases?: number
+  risk_matrix_generation?: boolean
+  is_active?: boolean
 }
 
 // Extended types for Test Execution module

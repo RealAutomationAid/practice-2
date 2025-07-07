@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
           }
         }
         
-        report.server.techStack = [...new Set(techStack)] // Remove duplicates
+        report.server.techStack = Array.from(new Set(techStack)) // Remove duplicates
         
       } catch (error) {
         console.error('Server info error:', error)
