@@ -115,3 +115,5 @@ The app uses a Navbar component with routing between:
 
 
 After you are done with the changes create an readme_<feature> file
+
+Use available MCP tools

@@ -339,15 +339,15 @@ export function CompactBugTable({
   }, [])
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm ${className}`}>
+    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden ${className}`}>
       {/* Compact Header */}
-      <div className="px-4 py-3 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-3">
+      <div className="px-4 py-4 border-b border-gray-200 bg-gray-50">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
           <div className="flex items-center gap-4">
             <h3 className="text-lg font-semibold text-gray-900">
               Bug Reports
             </h3>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
               {filteredData.length} of {totalCount}
             </span>
           </div>
@@ -356,7 +356,7 @@ export function CompactBugTable({
             <button
               onClick={onRefresh}
               disabled={loading}
-              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
               title="Refresh"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -364,7 +364,7 @@ export function CompactBugTable({
             
             <button
               onClick={onExport}
-              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
               title="Export"
             >
               <Download className="w-4 h-4" />
@@ -373,23 +373,23 @@ export function CompactBugTable({
         </div>
 
         {/* Search Bar */}
-        <div className="mb-3 relative max-w-md">
+        <div className="mb-4 relative max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search bugs..."
-            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
           />
         </div>
 
-                 {/* Inline Filters */}
-         <InlineFilters
-           filterState={filterState}
-           onFilterChange={handleFilterChange}
-           reporters={reporters}
-           bugCounts={bugCounts as any}
-         />
+        {/* Inline Filters */}
+        <InlineFilters
+          filterState={filterState}
+          onFilterChange={handleFilterChange}
+          reporters={reporters}
+          bugCounts={bugCounts as any}
+        />
       </div>
 
       {/* Compact Table */}
@@ -404,42 +404,42 @@ export function CompactBugTable({
             <p className="text-gray-500">No bugs found matching your criteria</p>
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+          <table className="w-full min-w-[800px]">
+            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
               <tr>
-                <th className="w-8 px-3 py-2 text-left"></th>
-                <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-8 px-3 py-3 text-left"></th>
+                <th className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
                   Bug
                 </th>
-                <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                   Status
                 </th>
-                <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                   Priority
                 </th>
-                <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                   Reporter
                 </th>
-                <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
                   Created
                 </th>
-                <th className="w-16 px-3 py-2 text-left"></th>
+                <th className="w-20 px-3 py-3 text-left"></th>
               </tr>
             </thead>
-            <tbody className="divide-y-0">
+            <tbody className="divide-y divide-gray-100 bg-white">
               {filteredData.map((bug, index) => {
                 const isExpanded = expandedRows.has(bug.id)
                 
                 return (
                   <React.Fragment key={bug.id}>
                     <tr 
-                      className="group hover:bg-blue-50 transition-colors border-b border-gray-100"
+                      className="group hover:bg-blue-50 transition-colors"
                     >
                       {/* Expand/Collapse Button */}
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-4 align-top">
                         <button
                           onClick={() => toggleRowExpansion(bug.id)}
-                          className="p-0.5 text-gray-400 hover:text-gray-600 transition-colors"
+                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                         >
                           {isExpanded ? (
                             <ChevronDown className="w-4 h-4" />
@@ -450,11 +450,11 @@ export function CompactBugTable({
                       </td>
 
                       {/* Bug Title & ID */}
-                      <td className="px-3 py-2">
-                        <div className="flex flex-col">
+                      <td className="px-3 py-4 align-top">
+                        <div className="flex flex-col space-y-1">
                           <button
                             onClick={() => toggleRowExpansion(bug.id)}
-                            className="text-left text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors line-clamp-1"
+                            className="text-left text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors line-clamp-2"
                           >
                             {bug.title}
                           </button>
@@ -465,12 +465,12 @@ export function CompactBugTable({
                       </td>
 
                       {/* Status */}
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-4 align-top">
                         <StatusBadge status={bug.status || 'open'} />
                       </td>
 
                       {/* Priority & Severity */}
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-4 align-top">
                         <PriorityIndicator 
                           priority={bug.priority || 'low'} 
                           severity={bug.severity || 'low'} 
@@ -478,9 +478,9 @@ export function CompactBugTable({
                       </td>
 
                       {/* Reporter */}
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-4 align-top">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
+                          <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
                             <User className="w-3 h-3 text-gray-500" />
                           </div>
                           <span className="text-sm text-gray-700 truncate">
@@ -490,35 +490,35 @@ export function CompactBugTable({
                       </td>
 
                       {/* Created Date */}
-                      <td className="px-3 py-2">
-                        <span className="text-sm text-gray-500">
+                      <td className="px-3 py-4 align-top">
+                        <span className="text-sm text-gray-500 whitespace-nowrap">
                           {bug.created_at ? formatUtils.formatDate(bug.created_at) : 'N/A'}
                         </span>
                       </td>
 
                       {/* Actions */}
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-4 align-top">
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleViewBug(bug)}
-                            className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-100 rounded transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-100 rounded transition-colors"
                             title="View Details"
                           >
-                            <Eye className="w-3 h-3" />
+                            <Eye className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => onEdit?.(bug)}
-                            className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors"
                             title="Edit"
                           >
-                            <Edit className="w-3 h-3" />
+                            <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => onDelete?.([bug.id])}
-                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded transition-colors"
                             title="Delete"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -527,7 +527,7 @@ export function CompactBugTable({
                     {/* Expanded Content */}
                     {isExpanded && (
                       <tr>
-                        <td colSpan={7}>
+                        <td colSpan={7} className="p-0">
                           <ExpandedRowContent bug={bug} />
                         </td>
                       </tr>

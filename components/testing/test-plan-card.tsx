@@ -32,7 +32,7 @@ export function TestPlanCard({
 }: TestPlanCardProps) {
   
   const content = (
-    <div className="relative overflow-hidden">
+    <div className="relative overflow-hidden flex-1 flex flex-col">
       {/* Animated gradient background for active state */}
       {isActive && (
         <div className={cn(
@@ -42,7 +42,7 @@ export function TestPlanCard({
       )}
       
       {/* Main content */}
-      <div className="relative">
+      <div className="relative flex-1 flex flex-col justify-between">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
@@ -113,8 +113,8 @@ export function TestPlanCard({
         {isExternal && !isActive && (
           <div className="mt-3 pt-3 border-t border-gray-200/30">
             <div className="flex items-center gap-2">
-              <ExternalLink className="w-3 h-3 text-blue-500" />
-              <span className="text-xs text-blue-600">Opens in new view</span>
+              <ExternalLink className="w-3 h-3 text-blue-500 flex-shrink-0" />
+              <span className="text-xs text-blue-600 truncate">Opens in new view</span>
             </div>
           </div>
         )}
@@ -124,7 +124,7 @@ export function TestPlanCard({
 
   const baseClassName = cn(
     "group relative p-6 rounded-2xl border cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1",
-    "bg-white/60 backdrop-blur-sm border-white/30 shadow-lg",
+    "bg-white/60 backdrop-blur-sm border-white/30 shadow-lg min-h-[140px] flex flex-col",
     isActive && "ring-2 ring-blue-200 shadow-2xl bg-white/80 scale-[1.02]",
     "hover:bg-white/70 hover:border-white/40"
   );

@@ -501,7 +501,7 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
   const selectedProject = testProjects.find((p) => p.id === selectedProjectId) || null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       <Toaster 
         position="top-right"
         toastOptions={{
@@ -523,21 +523,35 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
         }}
       />
 
-      {/* Dashboard Header */}
+      {/* Dashboard Header - Compact version without overlap */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <Bug className="w-8 h-8 text-red-600 mr-3" />
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Test Execution Dashboard</h1>
-                <p className="text-sm text-gray-600">Bug reporting and tracking system</p>
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center py-4 space-y-4 lg:space-y-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Bug className="w-6 h-6 text-red-600 mr-3" />
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Test Execution Dashboard</h1>
+                  <p className="text-sm text-gray-600">Bug reporting and tracking system</p>
+                </div>
+              </div>
+
+              {/* Mobile Summary Stats */}
+              <div className="flex lg:hidden items-center space-x-3 text-xs">
+                <div className="text-center">
+                  <div className="text-lg font-bold text-gray-900">{stats.total}</div>
+                  <div className="text-gray-600">Total</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-red-600">{stats.open}</div>
+                  <div className="text-gray-600">Open</div>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
               {/* Unified Project Selector */}
-              <div className="min-w-[280px]">
+              <div className="w-full sm:w-auto sm:min-w-[280px]">
                 <UnifiedProjectSelector
                   projects={testProjects}
                   selectedProjectId={selectedProjectId}
@@ -550,7 +564,7 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
                 />
               </div>
 
-              {/* Summary Stats */}
+              {/* Desktop Summary Stats */}
               <div className="hidden lg:flex items-center space-x-6 text-sm">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
@@ -571,22 +585,23 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center justify-center sm:justify-start space-x-2">
                 <button
                   onClick={() => setShowSummaryReport(!showSummaryReport)}
-                  className={`hidden sm:inline-flex items-center px-3 py-2 border rounded-md shadow-sm text-sm font-medium ${
+                  className={`flex items-center px-3 py-2 border rounded-md shadow-sm text-sm font-medium transition-colors ${
                     showSummaryReport 
                       ? 'border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100' 
                       : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
                   }`}
                 >
                   <BarChart3 className="w-4 h-4 mr-2" />
-                  {showSummaryReport ? 'Hide Reports' : 'Reports'}
+                  <span className="hidden sm:inline">{showSummaryReport ? 'Hide Reports' : 'Reports'}</span>
+                  <span className="sm:hidden">Reports</span>
                 </button>
 
                 <button
                   onClick={handleExport}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   <span className="hidden sm:inline">Export</span>
@@ -594,7 +609,7 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
 
                 <button
                   onClick={() => setShowCreateForm(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                  className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   <span className="hidden sm:inline">New Bug</span>
@@ -607,10 +622,10 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Create/Edit Form Modal */}
         {showCreateForm && (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[60]">
             <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-5xl shadow-lg rounded-md bg-white">
               <EnhancedBugForm
                 onSubmit={editingBug ? handleUpdateBug : handleCreateBug}
@@ -640,6 +655,7 @@ export function TestExecutionModule({ initialData = [] }: TestExecutionModulePro
             data={filteredBugs}
             loading={loading}
             totalCount={filteredBugs.length}
+            onRefresh={loadBugs}
             onEdit={handleEditBug}
             onDelete={handleDeleteBugs}
             onExport={handleExport}
