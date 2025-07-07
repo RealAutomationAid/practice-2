@@ -6,6 +6,7 @@ export interface TestProjectOption {
   name: string
   description?: string
   created_at: string
+  created_by_email?: string
   sut_analysis?: string
   test_plan?: string
   requirements?: string
