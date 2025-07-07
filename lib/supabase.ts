@@ -227,4 +227,73 @@ export const attachmentApi = {
       .delete()
       .eq('id', id)
   }
+}
+
+// Website Audit API functions
+export const auditReportApi = {
+  // Create new audit report
+  create: async (auditData: any, userIdentifier: string = 'anonymous') => {
+    return await supabase
+      .from('winners_audit_reports')
+      .insert({
+        url: auditData.url,
+        user_identifier: userIdentifier,
+        report_data: auditData,
+        ai_analysis: null,
+        test_project_id: auditData.test_project_id || null,
+      })
+      .select()
+      .single()
+  },
+
+  // Get all audit reports for a user
+  getAll: async (userIdentifier: string = 'anonymous', limit: number = 50) => {
+    return await supabase
+      .from('winners_audit_reports')
+      .select('*')
+      .eq('user_identifier', userIdentifier)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+  },
+
+  // Get single audit report by ID
+  getById: async (id: string) => {
+    return await supabase
+      .from('winners_audit_reports')
+      .select('*')
+      .eq('id', id)
+      .single()
+  },
+
+  // Update audit report with AI analysis
+  updateWithAI: async (id: string, aiAnalysis: any) => {
+    return await supabase
+      .from('winners_audit_reports')
+      .update({
+        ai_analysis: aiAnalysis,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single()
+  },
+
+  // Delete audit report
+  delete: async (id: string) => {
+    return await supabase
+      .from('winners_audit_reports')
+      .delete()
+      .eq('id', id)
+  },
+
+  // Get audit reports by URL (for comparison/history)
+  getByUrl: async (url: string, userIdentifier: string = 'anonymous', limit: number = 10) => {
+    return await supabase
+      .from('winners_audit_reports')
+      .select('*')
+      .eq('url', url)
+      .eq('user_identifier', userIdentifier)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+  }
 } 

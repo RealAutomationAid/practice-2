@@ -5,7 +5,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 - `npm run dev` - Start development server at http://localhost:3000
-- `npm run build` - Build production version
 - `npm run start` - Start production server
 - `npm run lint` - Run ESLint code linting
 
@@ -113,3 +112,6 @@ The app uses a Navbar component with routing between:
 - **File Upload**: react-dropzone
 - **Forms**: react-hook-form
 - **AI Integration**: OpenAI API
+
+
+After you are done with the changes create an readme_<feature> file
