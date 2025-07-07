@@ -37,6 +37,11 @@ export interface Database {
         Insert: TestProjectInsert
         Update: TestProjectUpdate
       }
+      winners_sut_analysis: {
+        Row: WinnersSutAnalysis
+        Insert: SutAnalysisInsert
+        Update: SutAnalysisUpdate
+      }
     }
     Views: {
       [_ in never]: never
@@ -58,6 +63,9 @@ export type BugSeverity = 'low' | 'medium' | 'high' | 'critical'
 export type BugPriority = 'low' | 'medium' | 'high' | 'urgent'
 export type BugStatus = 'open' | 'in_progress' | 'resolved' | 'closed' | 'duplicate'
 export type TestSessionStatus = 'active' | 'completed' | 'paused'
+
+// SUT Analysis Types
+export type SutAnalysisStatus = 'pending' | 'crawling' | 'analyzing' | 'completed' | 'failed'
 
 export interface WinnersBugReport {
   id: string
@@ -134,6 +142,24 @@ export interface WinnersTestProject {
   is_active?: boolean
 }
 
+export interface WinnersSutAnalysis {
+  id: string
+  name: string
+  target_url: string
+  login_url?: string
+  username?: string
+  password_encrypted?: string
+  crawl_settings?: Json
+  crawl_data?: Json
+  ai_analysis?: Json
+  screenshots?: Json
+  status?: SutAnalysisStatus
+  error_message?: string
+  created_at?: string
+  updated_at?: string
+  created_by_email?: string
+}
+
 // Insert types for creating new records
 export type BugReportInsert = Omit<WinnersBugReport, 'id' | 'created_at' | 'updated_at'> & {
   id?: string
@@ -162,12 +188,19 @@ export type TestProjectInsert = Omit<WinnersTestProject, 'id' | 'created_at' | '
   updated_at?: string
 }
 
+export type SutAnalysisInsert = Omit<WinnersSutAnalysis, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string
+  created_at?: string
+  updated_at?: string
+}
+
 // Update types for updating existing records
 export type BugReportUpdate = Partial<WinnersBugReport>
 export type TestSessionUpdate = Partial<WinnersTestSession>
 export type SessionBugUpdate = Partial<WinnersSessionBug>
 export type AttachmentUpdate = Partial<WinnersAttachment>
 export type TestProjectUpdate = Partial<WinnersTestProject>
+export type SutAnalysisUpdate = Partial<WinnersSutAnalysis>
 
 // Form data interfaces for UI components
 export interface BugReportFormData {
@@ -215,6 +248,7 @@ export const BUG_SEVERITIES: BugSeverity[] = ['low', 'medium', 'high', 'critical
 export const BUG_PRIORITIES: BugPriority[] = ['low', 'medium', 'high', 'urgent']
 export const BUG_STATUSES: BugStatus[] = ['open', 'in_progress', 'resolved', 'closed', 'duplicate']
 export const TEST_SESSION_STATUSES: TestSessionStatus[] = ['active', 'completed', 'paused']
+export const SUT_ANALYSIS_STATUSES: SutAnalysisStatus[] = ['pending', 'crawling', 'analyzing', 'completed', 'failed']
 
 // Storage bucket configuration
 export const STORAGE_BUCKET = 'winners-test-assets'

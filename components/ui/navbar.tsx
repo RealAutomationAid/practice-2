@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Bug, FileText, Globe } from 'lucide-react'
+import { Bug, FileText, Globe, Target } from 'lucide-react'
 import { Logo } from './logo'
 
 interface NavbarProps {
@@ -59,6 +59,18 @@ export function Navbar({ currentPath = '/' }: NavbarProps) {
               >
                 <Globe className="w-4 h-4" />
                 <span>Website Audit</span>
+              </Link>
+              
+              <Link 
+                href="/sut-analysis" 
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive('/sut-analysis') 
+                    ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <Target className="w-4 h-4" />
+                <span>SUT Analysis</span>
               </Link>
             </div>
           </div>
