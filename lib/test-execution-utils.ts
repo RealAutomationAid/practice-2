@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { Database, WinnersBugReport, AttachmentInsert } from '@/lib/supabase-types'
 import { BugReportExtended, ExportOptions, BugSummaryStats, TestExecutionReport } from '@/components/test-execution/types'
-import * as Papa from 'papaparse'
+import Papa from 'papaparse'
 
 // Initialize Supabase client
 const supabase = createClient<Database>(
