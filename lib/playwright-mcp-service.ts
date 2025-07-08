@@ -138,22 +138,23 @@ export class PlaywrightMCPService {
         args: ['--no-sandbox', '--disable-setuid-sandbox']
       })
       
-      this.page = await this.browser.newPage()
+      // Set user agent via context if provided
+      if (this.crawlSettings.userAgent) {
+        const context = await this.browser.newContext({ userAgent: this.crawlSettings.userAgent })
+        this.page = await context.newPage()
+      } else {
+        this.page = await this.browser.newPage()
+      }
       
       // Set viewport
       await this.page.setViewportSize(this.crawlSettings.viewport!)
-      
-      // Set user agent if provided
-      if (this.crawlSettings.userAgent) {
-        await this.page.setUserAgent(this.crawlSettings.userAgent)
-      }
       
       // Set timeout
       this.page.setDefaultTimeout(this.crawlSettings.timeout!)
       
       console.log('Playwright MCP Service initialized successfully')
     } catch (error) {
-      console.error('Failed to initialize Playwright MCP Service:', error)
+      console.error('Failed to initialize Playwright MCP Service:', error instanceof Error ? error.message : String(error))
       throw error
     }
   }
@@ -216,7 +217,9 @@ export class PlaywrightMCPService {
       
     } catch (error) {
       console.error('Crawling failed:', error)
-      results.summary.errors.push(`Crawling failed: ${error.message}`)
+      results.summary.errors.push(
+        `Crawling failed: ${error instanceof Error ? error.message : String(error)}`
+      )
       throw error
     }
   }
@@ -230,7 +233,7 @@ export class PlaywrightMCPService {
       })
       console.log(`Navigated to: ${url}`)
     } catch (error) {
-      console.error(`Failed to navigate to ${url}:`, error)
+      console.error(`Failed to navigate to ${url}:`, error instanceof Error ? error.message : String(error))
       throw error
     }
   }
@@ -267,7 +270,7 @@ export class PlaywrightMCPService {
         }
       }
     } catch (error) {
-      console.log('No consent popups found or failed to handle:', error.message)
+      console.log('No consent popups found or failed to handle:', error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -311,8 +314,8 @@ export class PlaywrightMCPService {
       }
       
     } catch (error) {
-      console.error('Login failed:', error)
-      throw new Error(`Login failed: ${error.message}`)
+      console.error('Login failed:', error instanceof Error ? error.message : String(error))
+      throw new Error(`Login failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
@@ -357,8 +360,8 @@ export class PlaywrightMCPService {
       }
       
     } catch (error) {
-      console.error(`Failed to crawl ${url}:`, error)
-      results.summary.errors.push(`Failed to crawl ${url}: ${error.message}`)
+      console.error(`Failed to crawl ${url}:`, error instanceof Error ? error.message : String(error))
+      results.summary.errors.push(`Failed to crawl ${url}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
@@ -382,8 +385,8 @@ export class PlaywrightMCPService {
         const screenshot = await this.page.screenshot(screenshotOptions)
         pageData.screenshot = screenshot.toString('base64')
       } catch (screenshotError) {
-        console.error(`Screenshot failed for ${url}:`, screenshotError)
-        pageData.errors?.push(`Screenshot capture failed: ${screenshotError.message}`)
+        console.error(`Screenshot failed for ${url}:`, screenshotError instanceof Error ? screenshotError.message : String(screenshotError))
+        pageData.errors?.push(`Screenshot capture failed: ${screenshotError instanceof Error ? screenshotError.message : String(screenshotError)}`)
         // Continue without screenshot
       }
       
@@ -412,7 +415,7 @@ export class PlaywrightMCPService {
       pageData.metadata = await this.extractMetadata()
       
     } catch (error) {
-      pageData.errors?.push(`Data extraction failed: ${error.message}`)
+      pageData.errors?.push(`Data extraction failed: ${error instanceof Error ? error.message : String(error)}`)
     }
     
     return pageData
@@ -430,7 +433,7 @@ export class PlaywrightMCPService {
             name: element.name,
             type: element.type || 'text',
             required: element.required,
-            placeholder: element.placeholder,
+            placeholder: 'placeholder' in element ? (element as HTMLInputElement | HTMLTextAreaElement).placeholder : undefined,
             value: element.value,
             label: element.labels?.[0]?.textContent || '',
             options: element.tagName === 'SELECT' ? 
@@ -520,7 +523,7 @@ export class PlaywrightMCPService {
           type: element.type || element.tagName.toLowerCase(),
           name: element.name,
           id: element.id,
-          placeholder: element.placeholder,
+          placeholder: 'placeholder' in element ? (element as HTMLInputElement | HTMLTextAreaElement).placeholder : undefined,
           required: element.required,
           value: element.value
         }
@@ -532,15 +535,16 @@ export class PlaywrightMCPService {
     if (!this.page) return {}
     
     return await this.page.evaluate(() => {
-      const meta = {}
+      // @ts-nocheck
+      const meta: Record<string, any> = {}
       
       // Meta tags
       const metaTags = Array.from(document.querySelectorAll('meta'))
       metaTags.forEach(tag => {
-        const name = tag.getAttribute('name') || tag.getAttribute('property')
+        const name: string | null = tag.getAttribute('name') || tag.getAttribute('property')
         const content = tag.getAttribute('content')
         if (name && content) {
-          meta[name] = content
+          (meta as any)[name] = content
         }
       })
       
@@ -551,7 +555,7 @@ export class PlaywrightMCPService {
       meta['url'] = window.location.href
       
       // Technology indicators
-      meta['hasJQuery'] = typeof window['jQuery'] !== 'undefined'
+      meta['hasJQuery'] = typeof (window as any)['jQuery'] !== 'undefined'
       meta['hasReact'] = document.querySelector('[data-reactroot]') !== null
       meta['hasVue'] = document.querySelector('[data-v-]') !== null
       meta['hasAngular'] = document.querySelector('[ng-app], [data-ng-app]') !== null
@@ -566,7 +570,7 @@ export class PlaywrightMCPService {
     return await this.page.evaluate(() => {
       // Main navigation
       const mainNavSelectors = ['nav', '.navigation', '.nav', '.menu', 'header nav', '.header nav']
-      let mainNavigation = []
+      let mainNavigation: any[] = []
       
       for (const selector of mainNavSelectors) {
         const navElement = document.querySelector(selector)
@@ -583,7 +587,7 @@ export class PlaywrightMCPService {
       
       // Footer navigation
       const footerNavSelectors = ['footer nav', '.footer nav', 'footer .nav', '.footer .menu']
-      let footerNavigation = []
+      let footerNavigation: any[] = []
       
       for (const selector of footerNavSelectors) {
         const navElement = document.querySelector(selector)
@@ -600,7 +604,7 @@ export class PlaywrightMCPService {
       
       // Breadcrumbs
       const breadcrumbSelectors = ['.breadcrumb', '.breadcrumbs', '[aria-label="breadcrumb"]', '.crumb']
-      let breadcrumbs = []
+      let breadcrumbs: any[] = []
       
       for (const selector of breadcrumbSelectors) {
         const breadcrumbElement = document.querySelector(selector)

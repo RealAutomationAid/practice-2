@@ -1,8 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { ArrowLeft, Download, Eye, ExternalLink, Clock, CheckCircle, XCircle, AlertCircle, Play, FileText, Image as ImageIcon, Link as LinkIcon, MousePointer, Trash2, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { WinnersSutAnalysis } from '@/lib/supabase-types'
+import { 
+  ArrowLeft, Clock, Download, Eye, FileText, AlertCircle, ImageIcon, 
+  CheckCircle, XCircle, Play, MousePointer, LinkIcon as Link, 
+  ExternalLink, Trash2, X 
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface SutAnalysisDetailProps {
@@ -11,30 +15,30 @@ interface SutAnalysisDetailProps {
 }
 
 export function SutAnalysisDetail({ analysis, onBack }: SutAnalysisDetailProps) {
+  const [currentAnalysis, setCurrentAnalysis] = useState<WinnersSutAnalysis>(analysis)
   const [activeTab, setActiveTab] = useState<'overview' | 'crawl-data' | 'ai-analysis' | 'screenshots'>('overview')
   const [aiAnalysis, setAiAnalysis] = useState<any>(null)
   const [loadingAiAnalysis, setLoadingAiAnalysis] = useState(false)
   const [refreshingStatus, setRefreshingStatus] = useState(false)
-  const [currentAnalysis, setCurrentAnalysis] = useState(analysis)
-  
-  // Screenshot-related state
-  const [screenshotUrls, setScreenshotUrls] = useState<{[key: string]: string}>({})
-  const [loadingUrls, setLoadingUrls] = useState<{[key: string]: boolean}>({})
+  const [screenshotUrls, setScreenshotUrls] = useState<Record<string, string>>({})
+  const [loadingUrls, setLoadingUrls] = useState<Record<string, boolean>>({})
+  const [deletingScreenshots, setDeletingScreenshots] = useState<Record<string, boolean>>({})
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
-  const [deletingScreenshots, setDeletingScreenshots] = useState<{[key: string]: boolean}>({})
 
+  // Load AI analysis on mount
   useEffect(() => {
-    if (analysis.ai_analysis) {
-      setAiAnalysis(analysis.ai_analysis)
-    } else if (analysis.status === 'completed') {
+    if (currentAnalysis.ai_analysis) {
+      setAiAnalysis(currentAnalysis.ai_analysis)
+    } else if (currentAnalysis.status === 'completed') {
       fetchAiAnalysis()
     }
   }, [analysis])
 
   // Auto-load screenshot URLs when analysis changes
   useEffect(() => {
-    if (currentAnalysis.screenshots) {
-      currentAnalysis.screenshots.forEach((screenshot: any) => {
+    const screenshots = Array.isArray(currentAnalysis.screenshots) ? currentAnalysis.screenshots : []
+    if (screenshots.length > 0) {
+      screenshots.forEach((screenshot: any) => {
         if (screenshot.storage_path && !screenshotUrls[screenshot.storage_path] && !loadingUrls[screenshot.storage_path]) {
           loadScreenshotUrl(screenshot.storage_path)
         }
@@ -228,25 +232,34 @@ export function SutAnalysisDetail({ analysis, onBack }: SutAnalysisDetailProps) 
   }
 
   const downloadReport = () => {
+    // Helper function to safely get crawl data properties
+    const getCrawlData = () => {
+      return currentAnalysis.crawl_data && typeof currentAnalysis.crawl_data === 'object' && currentAnalysis.crawl_data !== null 
+        ? currentAnalysis.crawl_data as any 
+        : null
+    }
+
+    const crawlData = getCrawlData()
+    
     const content = `# SUT Analysis Report
     
 ## Analysis Details
 - **Name**: ${currentAnalysis.name}
 - **Target URL**: ${currentAnalysis.target_url}
 - **Status**: ${currentAnalysis.status}
-- **Created**: ${new Date(currentAnalysis.created_at || '').toLocaleString()}
-- **Updated**: ${new Date(currentAnalysis.updated_at || '').toLocaleString()}
+- **Created**: ${currentAnalysis.created_at ? new Date(currentAnalysis.created_at).toLocaleString() : 'Unknown'}
+- **Updated**: ${currentAnalysis.updated_at ? new Date(currentAnalysis.updated_at).toLocaleString() : 'Unknown'}
 
 ## Crawl Summary
-${currentAnalysis.crawl_data ? `
-- **Pages Crawled**: ${currentAnalysis.crawl_data.summary?.totalPages || 0}
-- **Forms Found**: ${currentAnalysis.crawl_data.summary?.totalForms || 0}
-- **Links Found**: ${currentAnalysis.crawl_data.summary?.totalLinks || 0}
-- **Images Found**: ${currentAnalysis.crawl_data.summary?.totalImages || 0}
+${crawlData ? `
+- **Pages Crawled**: ${crawlData.summary?.totalPages || 0}
+- **Forms Found**: ${crawlData.summary?.totalForms || 0}
+- **Links Found**: ${crawlData.summary?.totalLinks || 0}
+- **Images Found**: ${crawlData.summary?.totalImages || 0}
 ` : 'No crawl data available'}
 
 ## Features Detected
-${currentAnalysis.crawl_data?.features ? Object.entries(currentAnalysis.crawl_data.features)
+${crawlData?.features ? Object.entries(crawlData.features)
   .map(([feature, present]) => `- **${feature}**: ${present ? 'Yes' : 'No'}`)
   .join('\n') : 'No feature data available'}
 
@@ -282,90 +295,101 @@ ${aiAnalysis?.analysis || 'No AI analysis available'}
     }
   }
 
-  const renderOverview = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            <FileText className="w-5 h-5 text-blue-600" />
-            <span className="text-sm font-medium text-blue-900">Pages</span>
+  const renderOverview = () => {
+    // Helper function to safely get crawl data properties
+    const getCrawlData = () => {
+      return currentAnalysis.crawl_data && typeof currentAnalysis.crawl_data === 'object' && currentAnalysis.crawl_data !== null 
+        ? currentAnalysis.crawl_data as any 
+        : null
+    }
+
+    const crawlData = getCrawlData()
+
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center space-x-2">
+              <FileText className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-medium text-blue-900">Pages</span>
+            </div>
+            <p className="text-2xl font-bold text-blue-900 mt-1">
+              {crawlData?.summary?.totalPages || 0}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-blue-900 mt-1">
-            {currentAnalysis.crawl_data?.summary?.totalPages || 0}
-          </p>
-        </div>
-        
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            <MousePointer className="w-5 h-5 text-green-600" />
-            <span className="text-sm font-medium text-green-900">Forms</span>
+          
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center space-x-2">
+              <MousePointer className="w-5 h-5 text-green-600" />
+              <span className="text-sm font-medium text-green-900">Forms</span>
+            </div>
+            <p className="text-2xl font-bold text-green-900 mt-1">
+              {crawlData?.summary?.totalForms || 0}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-green-900 mt-1">
-            {currentAnalysis.crawl_data?.summary?.totalForms || 0}
-          </p>
-        </div>
-        
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            <LinkIcon className="w-5 h-5 text-purple-600" />
-            <span className="text-sm font-medium text-purple-900">Links</span>
+          
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div className="flex items-center space-x-2">
+              <Link className="w-5 h-5 text-purple-600" />
+              <span className="text-sm font-medium text-purple-900">Links</span>
+            </div>
+            <p className="text-2xl font-bold text-purple-900 mt-1">
+              {crawlData?.summary?.totalLinks || 0}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-purple-900 mt-1">
-            {currentAnalysis.crawl_data?.summary?.totalLinks || 0}
-          </p>
-        </div>
-        
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            <ImageIcon className="w-5 h-5 text-orange-600" />
-            <span className="text-sm font-medium text-orange-900">Images</span>
+          
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="flex items-center space-x-2">
+              <ImageIcon className="w-5 h-5 text-orange-600" />
+              <span className="text-sm font-medium text-orange-900">Images</span>
+            </div>
+            <p className="text-2xl font-bold text-orange-900 mt-1">
+              {crawlData?.summary?.totalImages || 0}
+            </p>
           </div>
-          <p className="text-2xl font-bold text-orange-900 mt-1">
-            {currentAnalysis.crawl_data?.summary?.totalImages || 0}
-          </p>
         </div>
+
+        {/* Features Detected */}
+        {crawlData?.features && (
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Features Detected</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {Object.entries(crawlData.features).map(([feature, present]) => (
+                <div key={feature} className="flex items-center space-x-2">
+                  <div className={`w-3 h-3 rounded-full ${present ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <span className="text-sm text-gray-700 capitalize">
+                    {feature.replace(/([A-Z])/g, ' $1').toLowerCase()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Site Map */}
+        {crawlData?.sitemap && Array.isArray(crawlData.sitemap) && (
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Site Map</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {crawlData.sitemap.map((url: string, index: number) => (
+                <div key={index} className="flex items-center space-x-2 text-sm">
+                  <ExternalLink className="w-3 h-3 text-gray-400" />
+                  <a 
+                    href={url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 truncate"
+                  >
+                    {url}
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Features Detected */}
-      {currentAnalysis.crawl_data?.features && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Features Detected</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {Object.entries(currentAnalysis.crawl_data.features).map(([feature, present]) => (
-              <div key={feature} className="flex items-center space-x-2">
-                <div className={`w-3 h-3 rounded-full ${present ? 'bg-green-500' : 'bg-gray-300'}`} />
-                <span className="text-sm text-gray-700 capitalize">
-                  {feature.replace(/([A-Z])/g, ' $1').toLowerCase()}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Site Map */}
-      {currentAnalysis.crawl_data?.sitemap && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Site Map</h3>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {currentAnalysis.crawl_data.sitemap.map((url: string, index: number) => (
-              <div key={index} className="flex items-center space-x-2 text-sm">
-                <ExternalLink className="w-3 h-3 text-gray-400" />
-                <a 
-                  href={url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 truncate"
-                >
-                  {url}
-                </a>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
+    )
+  }
 
   const renderCrawlData = () => (
     <div className="space-y-4">
@@ -435,14 +459,17 @@ ${aiAnalysis?.analysis || 'No AI analysis available'}
     </div>
   )
 
-  const renderScreenshots = () => (
+  const renderScreenshots = () => {
+    const screenshots = Array.isArray(currentAnalysis.screenshots) ? currentAnalysis.screenshots : []
+    
+    return (
       <div className="space-y-4">
-        {currentAnalysis.screenshots && currentAnalysis.screenshots.length > 0 ? (
+        {screenshots.length > 0 ? (
           <>
             {/* Bulk Actions */}
             <div className="flex justify-between items-center">
               <p className="text-sm text-gray-600">
-                {currentAnalysis.screenshots.length} screenshot{currentAnalysis.screenshots.length !== 1 ? 's' : ''}
+                {screenshots.length} screenshot{screenshots.length !== 1 ? 's' : ''}
               </p>
               <div className="flex space-x-2">
                 <button
@@ -464,7 +491,7 @@ ${aiAnalysis?.analysis || 'No AI analysis available'}
 
             {/* Screenshots Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {currentAnalysis.screenshots.map((screenshot: any, index: number) => {
+              {screenshots.map((screenshot: any, index: number) => {
                 const storagePath = screenshot.storage_path
                 const isLoading = loadingUrls[storagePath]
                 const imageUrl = screenshotUrls[storagePath]
@@ -561,6 +588,7 @@ ${aiAnalysis?.analysis || 'No AI analysis available'}
         )}
       </div>
     )
+  }
 
   return (
     <div className="space-y-6">

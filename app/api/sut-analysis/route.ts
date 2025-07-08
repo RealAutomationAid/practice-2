@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Encrypt password if provided
-    const password_encrypted = password ? encrypt(password) : null
+    const password_encrypted = password ? encrypt(password) : undefined
 
     // Create initial record
     const sutAnalysis: SutAnalysisInsert = {
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       data: {
         ...insertedData,
-        password_encrypted: password_encrypted ? '********' : null
+        password_encrypted: password_encrypted ? '********' : undefined
       },
       message: 'SUT analysis created and crawling started'
     })
@@ -256,7 +256,7 @@ async function performCrawlAnalysis(
       .from('winners_sut_analysis')
       .update({
         status: 'failed',
-        error_message: error.message,
+        error_message: error instanceof Error ? error.message : String(error),
         updated_at: new Date().toISOString()
       })
       .eq('id', analysisId)
@@ -302,7 +302,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       data: {
         ...data,
-        password_encrypted: data.password_encrypted ? '********' : null
+        password_encrypted: data.password_encrypted ? '********' : undefined
       }
     })
 
