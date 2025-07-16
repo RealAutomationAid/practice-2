@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(node:*)",
+      "Bash(rm:*)",
+      "Bash(printenv)",
+      "Bash(env)",
+      "Bash(pkill:*)",
+      "Bash(true)"
+    ],
+    "deny": []
+  }
+}

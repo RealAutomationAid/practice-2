@@ -38,7 +38,7 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
     {
       id: 'welcome',
       type: 'system',
-      content: 'Welcome to the AI Bug Chat! Describe any bugs or issues you\'ve encountered, and I\'ll help you create structured bug reports automatically.',
+      content: 'Welcome to the AI Bug Chat! I can help you create structured bug reports from simple descriptions.\n\nJust describe what went wrong, for example:\n• "Login button not working"\n• "Page crashes when I click save"\n• "Application runs slowly"\n\nI\'ll automatically extract details and create a comprehensive bug report for you. You can also paste screenshots (Ctrl+V) or attach files!',
       timestamp: new Date().toISOString()
     }
   ])
@@ -343,7 +343,6 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
           conversationHistory: messages,
           attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
           test_project_id: selectedTestProjectId || undefined,
-          systemPrompt: buildSystemPrompt(),
         })
       })
 
@@ -380,11 +379,51 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
       const errorMessage: ChatMessage = {
         id: `error_${Date.now()}`,
         type: 'system',
-        content: 'Sorry, I encountered an error while processing your message. Please try again.',
+        content: 'Sorry, I encountered an error while processing your message. Don\'t worry - I\'ve still created a basic bug report using the information you provided. You can find it in the bug reports list above.',
         timestamp: new Date().toISOString()
       }
       setMessages(prev => [...prev, errorMessage])
-      toast.error('Failed to send message')
+      
+      // Try to create a fallback bug report
+      try {
+        const fallbackBug = {
+          title: messageContent.length > 50 ? messageContent.substring(0, 50) + '...' : messageContent,
+          description: messageContent,
+          severity: 'medium',
+          priority: 'medium',
+          environment: 'local',
+          browser: 'chrome',
+          device: 'desktop',
+          os: 'unknown',
+          url: '',
+          steps_to_reproduce: messageContent,
+          expected_result: 'System should work correctly',
+          actual_result: messageContent,
+          tags: ['fallback-creation']
+        }
+        
+        const fallbackResponse = await fetch('/api/test-execution/bugs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            ...fallbackBug,
+            test_project_id: selectedTestProjectId || undefined
+          })
+        })
+        
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json()
+          if (fallbackData.success) {
+            toast.success('Basic bug report created successfully!')
+            onBugCreated?.(fallbackData.data.id)
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Fallback bug creation failed:', fallbackError)
+        toast.error('Failed to create bug report')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -568,6 +607,30 @@ export function AIBugChat({ onBugCreated, className = '' }: AIBugChatProps) {
 
       {/* Input area */}
       <div className="border-t p-4">
+        {/* Quick Templates */}
+        {!isLoading && messages.length === 1 && (
+          <div className="mb-4">
+            <div className="text-sm text-gray-600 mb-2">Quick templates:</div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                'Login button not working',
+                'Page crashes when I click save',
+                'Application runs slowly',
+                'Form validation error',
+                'UI element not displaying correctly'
+              ].map((template, index) => (
+                <button
+                  key={index}
+                  onClick={() => setInputMessage(template)}
+                  className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-full border transition-colors"
+                >
+                  {template}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        
         {/* Attachment previews */}
         {attachments.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-2">

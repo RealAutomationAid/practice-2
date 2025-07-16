@@ -3,10 +3,39 @@ import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 import { AuditReport } from '@/types/audit'
 
-// Initialize OpenAI client
-const openai = process.env.OPENAI_API_KEY 
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null
+// Initialize OpenAI client dynamically on each request
+function getOpenAIClient() {
+  // Force load from .env.local first, then .env, then system env
+  const fs = require('fs')
+  let apiKey = process.env.OPENAI_API_KEY
+  
+  // Override system env with .env.local if exists
+  if (fs.existsSync('.env.local')) {
+    const envContent = fs.readFileSync('.env.local', 'utf8')
+    const match = envContent.match(/OPENAI_API_KEY=(.+)/)
+    if (match) {
+      apiKey = match[1].trim()
+      console.log('Using API key from .env.local (ends with:', apiKey.slice(-8) + ')')
+    }
+  }
+  
+  // Override with .env if .env.local doesn't have it
+  if (!apiKey && fs.existsSync('.env')) {
+    const envContent = fs.readFileSync('.env', 'utf8')
+    const match = envContent.match(/OPENAI_API_KEY=(.+)/)
+    if (match) {
+      apiKey = match[1].trim()
+      console.log('Using API key from .env (ends with:', apiKey.slice(-8) + ')')
+    }
+  }
+  
+  if (!apiKey) {
+    console.error('OpenAI API key not configured')
+    return null
+  }
+  
+  return new OpenAI({ apiKey })
+}
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -216,35 +245,68 @@ export async function POST(request: NextRequest) {
 
     let analysis
 
+    const openai = getOpenAIClient()
     if (openai) {
-      try {
-        console.log('Generating AI analysis for:', auditReport.url)
-        
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4',
-          messages: [
-            { role: 'system', content: AI_ANALYSIS_PROMPT },
-            { 
-              role: 'user', 
-              content: `Analyze this website audit report:\n\n${JSON.stringify(auditReport, null, 2)}`
-            }
-          ],
-          temperature: 0.3,
-          max_tokens: 3000
-        })
+      const maxRetries = 3
+      const baseDelay = 1000
+      
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          console.log(`Generating AI analysis for: ${auditReport.url} (attempt ${attempt + 1})`)
+          
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4',
+            messages: [
+              { role: 'system', content: AI_ANALYSIS_PROMPT },
+              { 
+                role: 'user', 
+                content: `Analyze this website audit report:\n\n${JSON.stringify(auditReport, null, 2).slice(0, 8000)}`
+              }
+            ],
+            temperature: 0.3,
+            max_tokens: 3000
+          })
 
-        const responseText = completion.choices[0]?.message?.content
-        if (!responseText) {
-          throw new Error('No response from OpenAI')
+          const responseText = completion.choices[0]?.message?.content
+          if (!responseText) {
+            throw new Error('No response from OpenAI')
+          }
+
+          // Parse the JSON response with better error handling
+          try {
+            analysis = JSON.parse(responseText)
+            console.log('AI analysis generated successfully')
+            break // Success, exit retry loop
+          } catch (parseError) {
+            console.error('Failed to parse OpenAI response:', parseError)
+            throw new Error('Invalid JSON response from OpenAI')
+          }
+          
+        } catch (aiError: any) {
+          console.error(`AI analysis attempt ${attempt + 1} failed:`, aiError.message)
+          
+          // Check if it's a rate limit error
+          if (aiError.status === 429 && attempt < maxRetries - 1) {
+            const delay = baseDelay * Math.pow(2, attempt)
+            console.log(`Rate limited, waiting ${delay}ms before retry...`)
+            await new Promise(resolve => setTimeout(resolve, delay))
+            continue
+          }
+
+          // Check if it's a server error and we can retry
+          if ((aiError.status >= 500 || aiError.code === 'ECONNRESET') && attempt < maxRetries - 1) {
+            const delay = baseDelay * Math.pow(2, attempt)
+            console.log(`Server error, waiting ${delay}ms before retry...`)
+            await new Promise(resolve => setTimeout(resolve, delay))
+            continue
+          }
+
+          // If this is the last attempt, use fallback
+          if (attempt === maxRetries - 1) {
+            console.error('All AI analysis attempts failed, using fallback')
+            analysis = generateFallbackAnalysis(auditReport)
+          }
         }
-
-        // Parse the JSON response
-        analysis = JSON.parse(responseText)
-        console.log('AI analysis generated successfully')
-        
-      } catch (aiError) {
-        console.error('AI analysis failed, using fallback:', aiError)
-        analysis = generateFallbackAnalysis(auditReport)
       }
     } else {
       console.log('OpenAI not available, using fallback analysis')

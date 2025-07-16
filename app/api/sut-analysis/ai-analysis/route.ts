@@ -3,10 +3,39 @@ import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 import { Database } from '@/lib/supabase-types'
 
-// Initialize OpenAI client
-const openai = process.env.OPENAI_API_KEY 
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null
+// Initialize OpenAI client dynamically on each request
+function getOpenAIClient() {
+  // Force load from .env.local first, then .env, then system env
+  const fs = require('fs')
+  let apiKey = process.env.OPENAI_API_KEY
+  
+  // Override system env with .env.local if exists
+  if (fs.existsSync('.env.local')) {
+    const envContent = fs.readFileSync('.env.local', 'utf8')
+    const match = envContent.match(/OPENAI_API_KEY=(.+)/)
+    if (match) {
+      apiKey = match[1].trim()
+      console.log('Using API key from .env.local (ends with:', apiKey.slice(-8) + ')')
+    }
+  }
+  
+  // Override with .env if .env.local doesn't have it
+  if (!apiKey && fs.existsSync('.env')) {
+    const envContent = fs.readFileSync('.env', 'utf8')
+    const match = envContent.match(/OPENAI_API_KEY=(.+)/)
+    if (match) {
+      apiKey = match[1].trim()
+      console.log('Using API key from .env (ends with:', apiKey.slice(-8) + ')')
+    }
+  }
+  
+  if (!apiKey) {
+    console.error('OpenAI API key not configured')
+    return null
+  }
+  
+  return new OpenAI({ apiKey })
+}
 
 // Initialize Supabase client
 const supabase = createClient<Database>(
@@ -171,26 +200,31 @@ export async function POST(request: NextRequest) {
 
     let analysis: string
 
+    const openai = getOpenAIClient()
     if (openai) {
-      try {
-        console.log('Generating AI SUT analysis for:', sutData.name)
-        
-        // Prepare crawl data summary for AI
-        const crawlDataSummary = JSON.stringify({
-          targetUrl: sutData.target_url,
-          pages: sutData.crawl_data.pages,
-          features: sutData.crawl_data.features,
-          navigation: sutData.crawl_data.navigation,
-          summary: sutData.crawl_data.summary
-        }, null, 2)
+      const maxRetries = 3
+      const baseDelay = 1000
+      
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          console.log(`Generating AI SUT analysis for: ${sutData.name} (attempt ${attempt + 1})`)
+          
+          // Prepare crawl data summary for AI (with size limit)
+          const crawlDataSummary = JSON.stringify({
+            targetUrl: sutData.target_url,
+            pages: sutData.crawl_data.pages,
+            features: sutData.crawl_data.features,
+            navigation: sutData.crawl_data.navigation,
+            summary: sutData.crawl_data.summary
+          }, null, 2).slice(0, 12000) // Limit size to avoid token limits
 
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4',
-          messages: [
-            { role: 'system', content: SUT_ANALYSIS_PROMPT },
-            { 
-              role: 'user', 
-              content: `Analyze this System Under Test based on the comprehensive crawl data:
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4',
+            messages: [
+              { role: 'system', content: SUT_ANALYSIS_PROMPT },
+              { 
+                role: 'user', 
+                content: `Analyze this System Under Test based on the comprehensive crawl data:
 
 **Application Name**: ${sutData.name}
 **Target URL**: ${sutData.target_url}
@@ -200,23 +234,46 @@ export async function POST(request: NextRequest) {
 ${crawlDataSummary}
 
 Please provide a comprehensive SUT analysis following the structured format.`
-            }
-          ],
-          temperature: 0.3,
-          max_tokens: 4000
-        })
+              }
+            ],
+            temperature: 0.3,
+            max_tokens: 4000
+          })
 
-        const responseText = completion.choices[0]?.message?.content
-        if (!responseText) {
-          throw new Error('No response from OpenAI')
+          const responseText = completion.choices[0]?.message?.content
+          if (!responseText) {
+            throw new Error('No response from OpenAI')
+          }
+
+          analysis = responseText
+          console.log('AI SUT analysis generated successfully')
+          break // Success, exit retry loop
+          
+        } catch (aiError: any) {
+          console.error(`AI SUT analysis attempt ${attempt + 1} failed:`, aiError.message)
+          
+          // Check if it's a rate limit error
+          if (aiError.status === 429 && attempt < maxRetries - 1) {
+            const delay = baseDelay * Math.pow(2, attempt)
+            console.log(`Rate limited, waiting ${delay}ms before retry...`)
+            await new Promise(resolve => setTimeout(resolve, delay))
+            continue
+          }
+
+          // Check if it's a server error and we can retry
+          if ((aiError.status >= 500 || aiError.code === 'ECONNRESET') && attempt < maxRetries - 1) {
+            const delay = baseDelay * Math.pow(2, attempt)
+            console.log(`Server error, waiting ${delay}ms before retry...`)
+            await new Promise(resolve => setTimeout(resolve, delay))
+            continue
+          }
+
+          // If this is the last attempt, use fallback
+          if (attempt === maxRetries - 1) {
+            console.error('All AI SUT analysis attempts failed, using fallback')
+            analysis = generateFallbackAnalysis(sutData.crawl_data)
+          }
         }
-
-        analysis = responseText
-        console.log('AI SUT analysis generated successfully')
-        
-      } catch (aiError) {
-        console.error('AI analysis failed, using fallback:', aiError)
-        analysis = generateFallbackAnalysis(sutData.crawl_data)
       }
     } else {
       console.log('OpenAI not available, using fallback analysis')
